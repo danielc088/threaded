@@ -1,11 +1,12 @@
 """
-Preprocessing pipeline for the uploaded clothing images (my wardrobe for now)
-Takes the raw ios jpg photos and makes them consistent for feature extraction later
+preprocessing pipeline for the uploaded clothing images (my wardrobe for now)
+takes the raw jpg photos and makes them consistent for feature extraction later
 """
 
 import cv2
-from PIL import Image
+from PIL import Image, ImageEnhance
 import rembg as rb
+import numpy as np
 from pathlib import Path
 
 
@@ -16,9 +17,53 @@ def load_image(image_path):
     return Image.fromarray(img_rgb)
 
 
+def enhance_contrast_and_brightness(img, contrast_factor=1.3, brightness_factor=1.1, saturation_factor=1.4):
+    """make colours more vibrant and reduce shadow effects"""
+    
+    # enhance contrast first
+    contrast_enhancer = ImageEnhance.Contrast(img)
+    img_contrast = contrast_enhancer.enhance(contrast_factor)
+    
+    # boost saturation to make colours pop
+    saturation_enhancer = ImageEnhance.Color(img_contrast)
+    img_saturated = saturation_enhancer.enhance(saturation_factor)
+    
+    # then adjust brightness slightly
+    brightness_enhancer = ImageEnhance.Brightness(img_saturated)
+    img_enhanced = brightness_enhancer.enhance(brightness_factor)
+    
+    return img_enhanced
+
+
 def remove_background(img):
     """apply an open source rembg library. this gets rid of that orange bedsheet (or any background really...)"""
     return rb.remove(img)
+
+
+def reduce_shadows_adaptive(img_array):
+    """use adaptive approach to handle shadows"""
+    img_float = img_array.astype(np.float32)
+    rgb = img_float[:, :, :3]
+    alpha = img_float[:, :, 3]
+    
+    clothing_mask = alpha > 0.5
+    
+    if clothing_mask.any():
+        # instead of global adjustment, use percentile-based normalisation
+        clothing_pixels = rgb[clothing_mask]
+        
+        # get the 75th percentile as "normal" brightness (not shadows, not highlights)
+        target_brightness = np.percentile(clothing_pixels, 75)
+        
+        # only boost pixels that are darker than this threshold
+        dark_mask = np.mean(rgb, axis=2) < target_brightness * 0.7
+        combined_mask = clothing_mask & dark_mask
+        
+        if combined_mask.any():
+            rgb[combined_mask] *= 1.3  # modest boost only to dark areas
+            rgb = np.clip(rgb, 0, 1)
+    
+    return np.concatenate([rgb, alpha[:, :, np.newaxis]], axis=2)
 
 
 def crop_transparent_space(img):
@@ -62,30 +107,44 @@ def center_and_resize(img, target_size=(800, 1000), padding=50):
     return final_img
 
 
-def preprocess_clothing_image(image_path, save_path=None):
-    """full pipeline: takes the raw image -> cleans and standardises the image"""
+def preprocess_clothing_image_stages(image_path, save_bg_removed=None, save_fully_processed=None):
+    """full pipeline with intermediate stages saved"""
     
-    # load the raw photo
+    # stage 1: load and enhance the raw photo
     img = load_image(image_path)
+    img_enhanced = enhance_contrast_and_brightness(img, saturation_factor=1.5)
     
-    # get rid of background 
-    img_no_bg = remove_background(img)
+    # stage 2: background removal 
+    img_no_bg = remove_background(img_enhanced)
     
-    # clean it up and make it standard size
-    processed_img = center_and_resize(img_no_bg)
+    # save background removed version if requested
+    if save_bg_removed:
+        img_no_bg.save(save_bg_removed)
     
-    # save it if we want to keep it
-    if save_path:
-        processed_img.save(save_path)
+    # stage 3: shadow reduction and full processing
+    img_array = np.array(img_no_bg).astype(np.float32) / 255.0
+    img_shadow_reduced = reduce_shadows_adaptive(img_array)
+    img_processed = Image.fromarray((img_shadow_reduced * 255).astype(np.uint8))
     
-    return processed_img
+    # final standardisation
+    final_img = center_and_resize(img_processed)
+    
+    # save fully processed version if requested
+    if save_fully_processed:
+        final_img.save(save_fully_processed)
+    
+    return img_no_bg, final_img
 
 
-def batch_preprocess(input_dir, output_dir):
-    """process the whole folder of images, skipping if already processed (this is a more long term design choice)"""
+def batch_preprocess(input_dir, bg_removed_dir, fully_processed_dir):
+    """process the whole folder with both output stages"""
     input_path = Path(input_dir)
-    output_path = Path(output_dir)
-    output_path.mkdir(exist_ok=True)
+    bg_path = Path(bg_removed_dir)
+    processed_path = Path(fully_processed_dir)
+    
+    # create output directories
+    bg_path.mkdir(exist_ok=True)
+    processed_path.mkdir(exist_ok=True)
     
     # find all images in the input folder
     image_extensions = ['.jpg', '.jpeg', '.png']
@@ -99,16 +158,22 @@ def batch_preprocess(input_dir, output_dir):
     skipped_count = 0
     
     for img_file in image_files:
-        # check if processed version already exists
-        output_file = output_path / f"{img_file.stem}_processed.png"
+        # define output file paths
+        bg_removed_file = bg_path / f"{img_file.stem}_bg_removed.png"
+        fully_processed_file = processed_path / f"{img_file.stem}_processed.png"
         
-        if output_file.exists():
+        # check if both versions already exist
+        if bg_removed_file.exists() and fully_processed_file.exists():
             print(f"Skipping {img_file.name} - already processed")
             skipped_count += 1
         else:
             print(f"Processing {img_file.name}...")
-            processed = preprocess_clothing_image(img_file, output_file)
+            bg_removed, fully_processed = preprocess_clothing_image_stages(
+                img_file, 
+                bg_removed_file, 
+                fully_processed_file
+            )
             processed_count += 1
-        
+    
     print(f"Processed: {processed_count} new images")
     print(f"Skipped: {skipped_count} already done")

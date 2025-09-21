@@ -4,14 +4,20 @@ main entry point for the application
 """
 
 from src.preprocessing.preprocessor import batch_preprocess
+from src.utils.palette_scraper import update_palette_database
 
 def main():
-    print("[STARTING] preprocessing...")
+
+    # process raw clothing images    
+    print("[STARTING] preprocessing wardrobe...")
+    batch_preprocess("data/raw_images", "data/bg_removed", "data/processed_images")
+    print("[FINISHED] preprocessing wardrobe...")
+
     
-    # process all raw images
-    batch_preprocess("data/raw_images", "data/processed_images")
-    
-    print("[FINISHED] preprocessing...")
+    # scrape for colour palettes to work with
+    print("[STARTING] colour palette scraping...")
+    update_palette_database("data/palettes.json", max_palettes=100)
+    print("[FINISHED] colour palette scraping...")
 
 if __name__ == "__main__":
     main()

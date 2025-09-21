@@ -21,18 +21,26 @@ def detect_dark_item(img):
     """check if this is a dark clothing item to avoid colour shifting"""
     img_array = np.array(img)
     avg_brightness = np.mean(img_array)
-    return avg_brightness < 0.4
+    return avg_brightness < 0.5
 
 
 def enhance_for_clothing_type(img, is_dark_item=False):
     """different enhancement based on clothing darkness to preserve colours"""
-    if is_dark_item:
-        # for dark items: minimal processing to avoid blue shifts
+    img_array = np.array(img)
+    avg_brightness = np.mean(img_array)
+    
+    if avg_brightness < 0.3:
+        # very dark items (black shoes, etc): almost no enhancement
         contrast_enhancer = ImageEnhance.Contrast(img)
-        img_enhanced = contrast_enhancer.enhance(1.1)  # gentle contrast only
+        img_enhanced = contrast_enhancer.enhance(1.05)  # minimal contrast boost
+        return img_enhanced
+    elif is_dark_item:
+        # moderately dark items: gentle processing
+        contrast_enhancer = ImageEnhance.Contrast(img)
+        img_enhanced = contrast_enhancer.enhance(1.1)
         return img_enhanced
     else:
-        # for bright items: full enhancement
+        # bright items: full enhancement
         contrast_enhancer = ImageEnhance.Contrast(img)
         img_contrast = contrast_enhancer.enhance(1.3)
         
@@ -53,7 +61,7 @@ def remove_background(img):
 
 
 def reduce_shadows_adaptive(img_array):
-    """use adaptive approach to handle shadows better"""
+    """use adaptive approach to handle shadows better, skip for very dark items"""
     img_float = img_array.astype(np.float32)
     rgb = img_float[:, :, :3]
     alpha = img_float[:, :, 3]
@@ -61,13 +69,16 @@ def reduce_shadows_adaptive(img_array):
     clothing_mask = alpha > 0.5
     
     if clothing_mask.any():
-        # instead of global adjustment, use percentile-based normalisation
+        # check if this is a very dark item - skip shadow processing
         clothing_pixels = rgb[clothing_mask]
+        avg_brightness = np.mean(clothing_pixels)
         
-        # get the 75th percentile as "normal" brightness (not shadows, not highlights)
+        if avg_brightness < 0.3:
+            # very dark items: skip shadow processing to avoid colour shifts
+            return np.concatenate([rgb, alpha[:, :, np.newaxis]], axis=2)
+        
+        # normal shadow processing for other items
         target_brightness = np.percentile(clothing_pixels, 75)
-        
-        # only boost pixels that are darker than this threshold
         dark_mask = np.mean(rgb, axis=2) < target_brightness * 0.7
         combined_mask = clothing_mask & dark_mask
         
@@ -120,24 +131,24 @@ def center_and_resize(img, target_size=(800, 1000), padding=50):
 
 
 def preprocess_clothing_image_stages(image_path, save_bg_removed=None, save_fully_processed=None):
-    """full pipeline with intermediate stages saved and smart enhancement"""
+    """full pipeline with intermediate stages saved and correct processing order"""
     
-    # stage 1: load raw photo and detect if it's dark
+    # stage 1: load raw photo
     img = load_image(image_path)
-    is_dark = detect_dark_item(img)
     
-    # apply appropriate enhancement based on clothing type
-    img_enhanced = enhance_for_clothing_type(img, is_dark)
-    
-    # stage 2: background removal 
-    img_no_bg = remove_background(img_enhanced)
+    # stage 2: background removal on RAW image (preserve original colours)
+    img_no_bg = remove_background(img)
     
     # save background removed version if requested
     if save_bg_removed:
         img_no_bg.save(save_bg_removed)
     
-    # stage 3: shadow reduction and full processing
-    img_array = np.array(img_no_bg).astype(np.float32) / 255.0
+    # stage 3: now apply enhancement to the background-removed image
+    is_dark = detect_dark_item(img_no_bg)
+    img_enhanced = enhance_for_clothing_type(img_no_bg, is_dark)
+    
+    # stage 4: shadow reduction
+    img_array = np.array(img_enhanced).astype(np.float32) / 255.0
     img_shadow_reduced = reduce_shadows_adaptive(img_array)
     img_processed = Image.fromarray((img_shadow_reduced * 255).astype(np.uint8))
     

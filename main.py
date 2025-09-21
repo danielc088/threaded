@@ -13,7 +13,6 @@ def main():
     batch_preprocess("data/raw_images", "data/bg_removed", "data/processed_images")
     print("[FINISHED] preprocessing wardrobe...")
 
-    
     # scrape for colour palettes to work with
     print("[STARTING] colour palette scraping...")
     update_palette_database("data/palettes.json", max_palettes=100)

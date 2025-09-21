@@ -17,22 +17,34 @@ def load_image(image_path):
     return Image.fromarray(img_rgb)
 
 
-def enhance_contrast_and_brightness(img, contrast_factor=1.3, brightness_factor=1.1, saturation_factor=1.4):
-    """make colours more vibrant and reduce shadow effects"""
-    
-    # enhance contrast first
-    contrast_enhancer = ImageEnhance.Contrast(img)
-    img_contrast = contrast_enhancer.enhance(contrast_factor)
-    
-    # boost saturation to make colours pop
-    saturation_enhancer = ImageEnhance.Color(img_contrast)
-    img_saturated = saturation_enhancer.enhance(saturation_factor)
-    
-    # then adjust brightness slightly
-    brightness_enhancer = ImageEnhance.Brightness(img_saturated)
-    img_enhanced = brightness_enhancer.enhance(brightness_factor)
-    
-    return img_enhanced
+def detect_dark_item(img):
+    """check if this is a dark clothing item to avoid colour shifting"""
+    img_array = np.array(img)
+    avg_brightness = np.mean(img_array)
+    return avg_brightness < 0.4
+
+
+def enhance_for_clothing_type(img, is_dark_item=False):
+    """different enhancement based on clothing darkness to preserve colours"""
+    if is_dark_item:
+        # for dark items: minimal processing to avoid blue shifts
+        contrast_enhancer = ImageEnhance.Contrast(img)
+        img_enhanced = contrast_enhancer.enhance(1.1)  # gentle contrast only
+        return img_enhanced
+    else:
+        # for bright items: full enhancement
+        contrast_enhancer = ImageEnhance.Contrast(img)
+        img_contrast = contrast_enhancer.enhance(1.3)
+        
+        # boost saturation to make colours pop
+        saturation_enhancer = ImageEnhance.Color(img_contrast)
+        img_saturated = saturation_enhancer.enhance(1.5)
+        
+        # then adjust brightness slightly
+        brightness_enhancer = ImageEnhance.Brightness(img_saturated)
+        img_enhanced = brightness_enhancer.enhance(1.1)
+        
+        return img_enhanced
 
 
 def remove_background(img):
@@ -41,7 +53,7 @@ def remove_background(img):
 
 
 def reduce_shadows_adaptive(img_array):
-    """use adaptive approach to handle shadows"""
+    """use adaptive approach to handle shadows better"""
     img_float = img_array.astype(np.float32)
     rgb = img_float[:, :, :3]
     alpha = img_float[:, :, 3]
@@ -108,11 +120,14 @@ def center_and_resize(img, target_size=(800, 1000), padding=50):
 
 
 def preprocess_clothing_image_stages(image_path, save_bg_removed=None, save_fully_processed=None):
-    """full pipeline with intermediate stages saved"""
+    """full pipeline with intermediate stages saved and smart enhancement"""
     
-    # stage 1: load and enhance the raw photo
+    # stage 1: load raw photo and detect if it's dark
     img = load_image(image_path)
-    img_enhanced = enhance_contrast_and_brightness(img, saturation_factor=1.5)
+    is_dark = detect_dark_item(img)
+    
+    # apply appropriate enhancement based on clothing type
+    img_enhanced = enhance_for_clothing_type(img, is_dark)
     
     # stage 2: background removal 
     img_no_bg = remove_background(img_enhanced)

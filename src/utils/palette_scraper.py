@@ -127,3 +127,6 @@ def update_palette_database(palettes_file, max_palettes=50):
     print(f"Added {added} new palettes. Total collection: {len(saved)}")
 
     return saved
+
+if __name__ == "__main__":
+    update_palette_database("data/palettes.json", max_palettes=100)

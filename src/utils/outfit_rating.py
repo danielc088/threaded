@@ -53,7 +53,6 @@ def rate_outfits(
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     df.to_csv(output_file, index=False)
-    print(f"\n✅ finished. saved ratings to {output_file}")
 
     return df
 

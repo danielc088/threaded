@@ -3,7 +3,7 @@ threaded - a personal project to digitalise my wardrobe
 main entry point for the application
 """
 
-from src.preprocessing.preprocessor import batch_preprocess
+from src.preprocessing.image_processor import batch_preprocess
 from src.utils.palette_scraper import update_palette_database
 from src.feature_extraction.features import process_wardrobe_features
 

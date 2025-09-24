@@ -10,16 +10,15 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 
 def rate_outfits(
-    processed_dir=r"C:\Users\ciaod\OneDrive - Australian National University\Desktop\projects\threaded\data\bg_removed",
+    processed_dir=r"C:\Users\ciaod\OneDrive - Australian National University\Desktop\projects\threaded\data\wardrobe\bg_removed",
     output_file="data/training/outfit_ratings.csv"
 ):
     """cycle through outfit combos, show images, and rate them (1–5 stars style)"""
 
     # wardrobe pieces we’re working with
-    # right now: 5 shirts, 5 pants, 4 shoes
-    shirts = [f"shirt_{i}_bg_removed.png" for i in range(1, 6)]
-    pants = [f"pants_{i}_bg_removed.png" for i in range(1, 6)]
-    shoes = [f"shoe_{i}_bg_removed.png" for i in range(1, 5)]
+    shirts = [f"shirt_{i}_bg_removed.png" for i in range(1, 15)]
+    pants = [f"pants_{i}_bg_removed.png" for i in range(1, 13)]
+    shoes = [f"shoes_{i}_bg_removed.png" for i in range(1, 5)]
 
     # build every possible combo of shirt + pants + shoes
     combinations = list(itertools.product(shirts, pants, shoes))

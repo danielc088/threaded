@@ -54,10 +54,57 @@ def enhance_for_clothing_type(img, is_dark_item=False):
         
         return img_enhanced
 
+def nuclear_option_orange_cleanup(img_no_bg, filename=None):
+    """Aggressively removes mid-light orange tones, unless explicitly skipped for certain shirts."""
+    
+# Skip orange cleanup entirely for specific shirts
+    if filename and any(skip in filename for skip in ["shirt_8", "shirt_12"]):
+        return img_no_bg  # unchanged
+    
+    img_array = np.array(img_no_bg)
+    rgb = img_array[:,:,:3]
+    alpha = img_array[:, :, 3]
+    
+    # Convert to HSV for better orange detection
+    hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
+    
+    # Default (aggressive) thresholds
+    hsv_lower, hsv_upper = (8, 80, 120), (25, 255, 255)
+    r_min, g_min, g_max, b_min, b_max = 180, 100, 200, 20, 120
+    
+    # If pants_4, relax thresholds (narrower hue range, higher value cutoff)
+    if filename and "pants_4" in filename:
+        hsv_lower, hsv_upper = (10, 100, 140), (22, 255, 255)  # narrower, higher value
+        r_min, g_min, g_max, b_min, b_max = 190, 110, 190, 30, 110  # stricter in RGB
+    
+    # Build masks
+    orange_mask = cv2.inRange(hsv, hsv_lower, hsv_upper)
+    light_orange_mask = (
+        (rgb[:,:,0] >= r_min) & 
+        (rgb[:,:,1] >= g_min) & (rgb[:,:,1] <= g_max) & 
+        (rgb[:,:,2] >= b_min) & (rgb[:,:,2] <= b_max)
+    )
+    
+    # Combine
+    combined_mask = (orange_mask > 0) | light_orange_mask
+    
+    # Apply to alpha
+    alpha[combined_mask] = 0
+    
+    # Clean up edges
+    kernel = np.ones((3,3), np.uint8)
+    alpha_binary = (alpha > 50).astype(np.uint8) * 255
+    alpha_cleaned = cv2.morphologyEx(alpha_binary, cv2.MORPH_CLOSE, kernel)
+    alpha_cleaned = cv2.morphologyEx(alpha_cleaned, cv2.MORPH_ERODE, kernel)
+    
+    img_array[:, :, 3] = alpha_cleaned
+    return Image.fromarray(img_array)
 
-def remove_background(img):
+
+def remove_background(img,filename=None):
     """apply an open source rembg library. this gets rid of that orange bedsheet (or any background really...)"""
-    return rb.remove(img)
+    result = nuclear_option_orange_cleanup(rb.remove(img,model_session='u2net_cloth'),filename=filename)
+    return result
 
 
 def reduce_shadows_adaptive(img_array):
@@ -137,7 +184,7 @@ def preprocess_clothing_image_stages(image_path, save_bg_removed=None, save_full
     img = load_image(image_path)
     
     # stage 2: background removal on RAW image (preserve original colours)
-    img_no_bg = remove_background(img)
+    img_no_bg = remove_background(img,filename=Path(image_path).stem)
     
     # save background removed version if requested
     if save_bg_removed:
@@ -151,7 +198,7 @@ def preprocess_clothing_image_stages(image_path, save_bg_removed=None, save_full
     img_array = np.array(img_enhanced).astype(np.float32) / 255.0
     img_shadow_reduced = reduce_shadows_adaptive(img_array)
     img_processed = Image.fromarray((img_shadow_reduced * 255).astype(np.uint8))
-    
+
     # final standardisation
     final_img = center_and_resize(img_processed)
     

@@ -8,3 +8,5 @@ wish list:
 - more clothing items in general
 - concept of 'style' i.e. business, athleisure
 - collaborative filtering. 
+- feedback loop
+- gap identifier, i.e. if an item of clothing had feature x you would get a boost in 40% of >= 4's

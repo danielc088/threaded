@@ -10,7 +10,7 @@ from pathlib import Path
 import os
 
 
-def display_outfit(shirt_id, pants_id, shoes_id, image_type="bg_removed", figsize=(12, 4)):
+def display_outfit(shirt_id, pants_id, shoes_id, image_type="bg_removed", figsize=(6, 12)):
     """
     display an outfit combination with images side by side
     
@@ -44,13 +44,13 @@ def display_outfit(shirt_id, pants_id, shoes_id, image_type="bg_removed", figsiz
             missing_files.append(f"{item}: {path}")
     
     if missing_files:
-        print("Missing image files:")
+        print("missing image files:")
         for missing in missing_files:
             print(f"  - {missing}")
         return
     
     # create the plot
-    fig, axes = plt.subplots(1, 3, figsize=figsize)
+    fig, axes = plt.subplots(3, 1, figsize=figsize)
     
     # load and display each image
     items = [
@@ -63,15 +63,15 @@ def display_outfit(shirt_id, pants_id, shoes_id, image_type="bg_removed", figsiz
         try:
             img = mpimg.imread(str(path))
             axes[i].imshow(img)
-            axes[i].set_title(f"{title}\n{item_id}")
+            axes[i].set_title(f"{title}")
             axes[i].axis('off')
         except Exception as e:
             axes[i].text(0.5, 0.5, f"Error loading\n{item_id}", 
                         ha='center', va='center', transform=axes[i].transAxes)
-            axes[i].set_title(f"{title}\n{item_id}")
+            axes[i].set_title(f"{title}")
             axes[i].axis('off')
     
-    plt.suptitle(f"Outfit: {shirt_id} + {pants_id} + {shoes_id}", fontsize=14, fontweight='bold')
+    plt.suptitle(f"Reccomended outfit", fontsize=14, fontweight='bold')
     plt.tight_layout()
     plt.show()
 
@@ -96,94 +96,9 @@ def display_outfit_from_dict(outfit_dict, image_type="bg_removed"):
     
     # display with score in title if available
     if 'score' in outfit_dict:
-        print(f"Outfit Score: {outfit_dict['score']:.3f}")
+        print(f"outfit score: {outfit_dict['score']:.3f}")
     
     display_outfit(shirt_id, pants_id, shoes_id, image_type)
-
-
-def compare_outfit_versions(shirt_id, pants_id, shoes_id):
-    """
-    show both background-removed and processed versions side by side
-    """
-    
-    print("Background Removed Version:")
-    display_outfit(shirt_id, pants_id, shoes_id, image_type="bg_removed")
-    
-    print("\nProcessed Version:")
-    display_outfit(shirt_id, pants_id, shoes_id, image_type="processed")
-
-
-def browse_wardrobe(image_type="bg_removed", items_per_row=5):
-    """
-    display all available clothing items in a grid
-    
-    Args:
-        image_type: "bg_removed" or "processed" 
-        items_per_row: how many items to show per row
-    """
-    
-    # determine image directory and pattern
-    if image_type == "bg_removed":
-        img_dir = Path("data/wardrobe/bg_removed")
-        pattern = "*_bg_removed.png"
-    else:
-        img_dir = Path("data/wardrobe/processed_images")
-        pattern = "*_processed.png"
-    
-    # find all image files
-    if not img_dir.exists():
-        print(f"Directory not found: {img_dir}")
-        return
-    
-    image_files = sorted(list(img_dir.glob(pattern)))
-    
-    if not image_files:
-        print(f"No images found in {img_dir}")
-        return
-    
-    print(f"Found {len(image_files)} clothing items")
-    
-    # calculate grid dimensions
-    n_items = len(image_files)
-    n_rows = (n_items + items_per_row - 1) // items_per_row  # ceiling division
-    
-    # create the plot
-    fig, axes = plt.subplots(n_rows, items_per_row, figsize=(items_per_row * 3, n_rows * 4))
-    
-    # handle single row case
-    if n_rows == 1:
-        axes = axes.reshape(1, -1)
-    elif items_per_row == 1:
-        axes = axes.reshape(-1, 1)
-    
-    # display each image
-    for i, img_file in enumerate(image_files):
-        row = i // items_per_row
-        col = i % items_per_row
-        
-        try:
-            img = mpimg.imread(str(img_file))
-            axes[row, col].imshow(img)
-            
-            # clean up filename for title
-            item_name = img_file.stem.replace("_bg_removed", "").replace("_processed", "")
-            axes[row, col].set_title(item_name)
-            axes[row, col].axis('off')
-            
-        except Exception as e:
-            axes[row, col].text(0.5, 0.5, f"Error\n{img_file.name}", 
-                               ha='center', va='center', transform=axes[row, col].transAxes)
-            axes[row, col].axis('off')
-    
-    # hide unused subplots
-    for i in range(len(image_files), n_rows * items_per_row):
-        row = i // items_per_row
-        col = i % items_per_row
-        axes[row, col].axis('off')
-    
-    plt.suptitle(f"Wardrobe Items ({image_type} version)", fontsize=16, fontweight='bold')
-    plt.tight_layout()
-    plt.show()
 
 
 def display_recommended_outfit(outfit_generator=None):
@@ -199,11 +114,10 @@ def display_recommended_outfit(outfit_generator=None):
     outfit = outfit_generator.get_random_outfit()
     
     if outfit is None:
-        print("No outfit recommendations available")
+        print("no outfit recommendations available")
         return
     
     # display it
-    print("Recommended Outfit:")
     display_outfit_from_dict(outfit, image_type="bg_removed")
     
     return outfit

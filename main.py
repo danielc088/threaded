@@ -25,23 +25,23 @@ def main():
         print("[FINISHED] updating color palettes...")
     
     # process raw clothing images    
-    print("[STARTING] preprocessing wardrobe...")
+    print("\n[STARTING] preprocessing wardrobe...")
     batch_preprocess("data/wardrobe/raw_images", "data/wardrobe/bg_removed", "data/wardrobe/processed_images")
     print("[FINISHED] preprocessing wardrobe...")
 
     # extract clothing features from processed images
-    print("[STARTING] feature extraction...")
+    print("\n[STARTING] feature extraction...")
     process_wardrobe_features("data/wardrobe/processed_images", "data/supporting/clothing_features.csv")
     print("[FINISHED] feature extraction...")
 
     # extract GenAI-based clothing features
-    print("[STARTING] genai feature extraction...")
+    print("\n[STARTING] genai feature extraction...")
     process_wardrobe_genai("data/wardrobe/processed_images","data/supporting/genai_features.csv")
     print("[FINISHED] genai feature extraction...")
 
     # optional: train recommendation model
     if True:
-        print("[STARTING] preparing training data...")
+        print("\n[STARTING] preparing training data...")
         prepare_training_data(
             ratings_file="data/supporting/outfit_ratings.csv",
             cv_features_file="data/supporting/clothing_features.csv", 
@@ -51,14 +51,14 @@ def main():
         )
         print("[FINISHED] preparing training data...")
         
-        print("[STARTING] training recommendation model...")
+        print("\n[STARTING] training recommendation model...")
         train_outfit_model(data_dir="data/training", save_path="models/outfit_recommender.pkl")
         print("[FINISHED] training recommendation model...")
 
     # optional: show outfit recommendations and browse wardrobe
     if SHOW_OUTFITS:
         print("\n" + "="*50)
-        print("OUTFIT RECOMMENDATIONS")
+        print("OUTFIT RECOMMENDATION")
         print("="*50)
         
         try:
@@ -66,14 +66,14 @@ def main():
             
             # show recommended outfits if model exists
             try:
-                print("[DISPLAYING] recommended outfit...")
+                print("recommended outfit...")
                 display_recommended_outfit()
             except Exception as e:
-                print(f"Could not generate outfit recommendations: {e}")
-                print("Make sure you have a trained model (set TRAIN_MODEL=True)")
+                print(f"could not generate outfit recommendations: {e}")
+                print("make sure you have a trained model (set TRAIN_MODEL=True)")
                 
         except ImportError as e:
-            print(f"Could not import outfit viewer: {e}")
+            print(f"could not import outfit viewer: {e}")
 
 
 if __name__ == "__main__":

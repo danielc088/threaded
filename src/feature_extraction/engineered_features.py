@@ -35,7 +35,6 @@ class OutfitFeatureEngine:
         if self.palettes_file.exists():
             with open(self.palettes_file, "r") as f:
                 self.palettes = json.load(f)
-            print(f"Loaded {len(self.palettes)} color palettes")
     
     def merge_clothing_features(self, df, cv_features_file, genai_features_file):
         """merge CV and GenAI features for each clothing item in the outfit"""
@@ -273,7 +272,6 @@ class OutfitFeatureEngine:
         
         # try to load from cache first
         if use_cache and cache_path.exists():
-            print(f"Loading cached engineered features from {cache_file}")
             cached_df = pd.read_csv(cache_file)
             
             # check if we have the same outfit combinations
@@ -286,9 +284,7 @@ class OutfitFeatureEngine:
                 feature_cols = [col for col in cached_df.columns if col not in required_cols]
                 missing_features = df_merged[feature_cols].isnull().any(axis=1).sum()
                 
-                if missing_features == 0:
-                    print(f"Using cached features for {len(df_merged)} outfit combinations")
-                    
+                if missing_features == 0:                    
                     # prepare for ML (drop ID columns, etc.)
                     drop_cols = [
                         "shirt_id", "pants_id", "shoes_id", "rating",
@@ -305,13 +301,12 @@ class OutfitFeatureEngine:
                     else:
                         X_final = self.create_polynomial_features(X, fit=False)
                     
-                    print(f"Loaded cached features: {len(X_final.columns)} features")
                     return X_final
                 else:
-                    print(f"Cache incomplete - {missing_features} combinations missing features, recomputing...")
+                    print(f"cache incomplete - {missing_features} combinations missing features, recomputing...")
         
         # run full feature engineering pipeline
-        print("Computing engineered features (this may take a while)...")
+        print("computing engineered features (this may take a while)...")
         
         # step 1: merge clothing features
         df = self.merge_clothing_features(df, cv_features_file, genai_features_file)
@@ -335,7 +330,6 @@ class OutfitFeatureEngine:
         if use_cache:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
             df.to_csv(cache_file, index=False)
-            print(f"Cached engineered features to {cache_file}")
         
         # step 7: prepare for ML
         drop_cols = [
@@ -354,7 +348,6 @@ class OutfitFeatureEngine:
         else:
             X_final = self.create_polynomial_features(X, fit=False)
         
-        print(f"Feature engineering complete: {len(X_final.columns)} features")
         return X_final
     
     def save_transformer(self, filepath="models/feature_transformer.pkl"):
@@ -370,7 +363,6 @@ class OutfitFeatureEngine:
         with open(filepath, 'wb') as f:
             pickle.dump(transformer_data, f)
         
-        print(f"Feature transformer saved to {filepath}")
     
     def load_transformer(self, filepath="models/feature_transformer.pkl"):
         """load saved feature transformer"""
@@ -383,8 +375,6 @@ class OutfitFeatureEngine:
         self.feature_names = transformer_data['feature_names']
         if 'palettes' in transformer_data:
             self.palettes = transformer_data['palettes']
-        
-        print(f"Feature transformer loaded from {filepath}")
 
 
 # convenience functions for easy import

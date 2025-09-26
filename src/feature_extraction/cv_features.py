@@ -185,18 +185,13 @@ def process_wardrobe_features(input_dir, output_csv):
     input_path = Path(input_dir)
     image_files = list(input_path.glob("*_processed.png"))
 
-    if not image_files:
-        print("No processed images found in", input_dir)
-        return
-
-    print(f"Found {len(image_files)} processed images to analyse")
+    print(f"Found {len(image_files)} processed clothes to analyse")
 
     # load existing CSV if it exists
     if Path(output_csv).exists():
         existing_df = pd.read_csv(output_csv)
         existing_ids = set(existing_df["clothing_id"].astype(str).tolist())
         wardrobe_data = existing_df.to_dict("records")
-        print(f"Loaded {len(existing_ids)} existing records from {output_csv}")
     else:
         existing_ids = set()
         wardrobe_data = []
@@ -207,10 +202,8 @@ def process_wardrobe_features(input_dir, output_csv):
         clothing_id = img_file.name.replace("_processed.png", "")
 
         if clothing_id in existing_ids:
-            print(f"Skipping {clothing_id} - already in CSV")
             continue
 
-        print(f"Extracting features from {img_file.name}...")
         features = extract_all_features(img_file)
 
         row = {
@@ -228,15 +221,12 @@ def process_wardrobe_features(input_dir, output_csv):
         wardrobe_data.extend(new_rows)
         df = pd.DataFrame(wardrobe_data)
         df.to_csv(output_csv, index=False)
-        print(f"\nAdded {len(new_rows)} new items. Saved to {output_csv}")
+        #print(f"\nAdded {len(new_rows)} new clothes")
     else:
         df = pd.DataFrame(wardrobe_data)
-        print("\nNo new items to process, CSV left unchanged.")
+        #print("\nNo new clothes to process")
 
-    print(f"Total clothing items in CSV: {len(df)}")
-
-    # preview
-    print("\nPreview of extracted features:")
-    print(df[["clothing_id", "texture_variance", "brightness", "vertical_symmetry"]].head())
+    print(f"processed: {len(new_rows)} new clothes")
+    print(f"skipped: {len(image_files)} clothes already done")
 
     return df

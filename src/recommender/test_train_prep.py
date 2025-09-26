@@ -23,12 +23,10 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 def load_and_merge_data(ratings_file, cv_features_file, genai_features_file):
     """load outfit ratings and merge with both CV and GenAI features for each clothing item"""
     
-    print("Loading outfit ratings...")
     df = pd.read_csv(ratings_file)
-    print(f"Loaded {len(df)} outfit combinations")
+    print(f"found: {len(df)} outfit combinations")
     
     # merge CV features (dominant colours, texture, brightness, symmetry)
-    print("Merging CV features...")
     cv_features = pd.read_csv(cv_features_file)
     
     for item in ["shirt", "pants", "shoes"]:
@@ -40,7 +38,6 @@ def load_and_merge_data(ratings_file, cv_features_file, genai_features_file):
         ).drop(columns=[f"{item}_clothing_id"])
     
     # merge GenAI features (pattern, style, fit, graphics)
-    print("Merging GenAI features...")
     genai_features = pd.read_csv(genai_features_file)
     
     for item in ["shirt", "pants", "shoes"]:
@@ -57,7 +54,6 @@ def load_and_merge_data(ratings_file, cv_features_file, genai_features_file):
         if col in df.columns:
             df[col] = df[col].astype(int)
     
-    print(f"Final dataset shape: {df.shape}")
     return df
 
 
@@ -72,7 +68,6 @@ def create_categorical_features(df):
                 categorical_cols.append(cat_col)
     
     if categorical_cols:
-        print(f"One-hot encoding {len(categorical_cols)} categorical columns...")
         # Use the new pandas syntax to avoid future warnings
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=FutureWarning)
@@ -116,11 +111,10 @@ def weighted_palette_distance(outfit_colours, palette_colours):
 def create_palette_features(df, palettes_file):
     """find closest trendy colour palette for each outfit and create palette features"""
     
-    print("Loading colour palettes...")
     with open(palettes_file, "r") as f:
         palettes = json.load(f)
     
-    print(f"Loaded {len(palettes)} colour palettes")
+    print(f"found: {len(palettes)} colour palettes")
     
     def closest_palette_weighted(row):
         """find the best matching palette for this outfit combination"""
@@ -143,21 +137,18 @@ def create_palette_features(df, palettes_file):
         
         return pd.Series([best_palette, best_dist])
     
-    print("Calculating palette matches for each outfit...")
     df[['closest_palette', 'palette_distance']] = df.apply(closest_palette_weighted, axis=1)
     
     # create one-hot encoded palette features
     palette_dummies = pd.get_dummies(df['closest_palette'], prefix='palette')
     df = pd.concat([df, palette_dummies], axis=1)
     
-    print(f"Created {len(palette_dummies.columns)} palette dummy features")
     return df
 
 
 def create_pairwise_features(df):
     """create features for specific clothing item combinations (shirt-pants, etc.)"""
     
-    print("Creating pairwise clothing combination features...")
     
     # create ID pairs for common combinations
     df['pair_shirt_pants'] = df['shirt_id'] + '_' + df['pants_id']
@@ -171,7 +162,6 @@ def create_pairwise_features(df):
     )
     
     df = pd.concat([df, pair_dummies], axis=1)
-    print(f"Created {len(pair_dummies.columns)} pairwise combination features")
     
     return df
 
@@ -201,7 +191,6 @@ def create_colour_similarity_features(df):
         
         return np.mean(distances)
     
-    print("Calculating colour similarity metrics...")
     df['overall_colour_similarity'] = df.apply(dominant_colour_similarity, axis=1)
     
     return df
@@ -223,7 +212,6 @@ def create_lab_colour_features(df):
         except:
             return pd.Series([np.nan, np.nan, np.nan])
     
-    print("Extracting LAB colour features...")
     for item in ["shirt", "pants", "shoes"]:
         df[[f"{item}_L", f"{item}_a", f"{item}_b"]] = \
             df[f"{item}_dominant_colours"].apply(extract_first_colour_lab)
@@ -234,11 +222,9 @@ def create_lab_colour_features(df):
 def create_polynomial_features(X_train, X_test):
     """create interaction features between numeric variables"""
     
-    print("Creating polynomial interaction features...")
     
     # identify numeric columns for interactions
     numeric_cols = X_train.select_dtypes(include=['int64', 'float64']).columns
-    print(f"Found {len(numeric_cols)} numeric columns for interactions")
     
     # create degree-2 interactions (no bias term)
     poly = PolynomialFeatures(degree=2, interaction_only=True, include_bias=False)
@@ -260,7 +246,6 @@ def create_polynomial_features(X_train, X_test):
     X_train_final = pd.concat([X_train[flag_cols], X_train_poly], axis=1)
     X_test_final = pd.concat([X_test[flag_cols], X_test_poly], axis=1)
     
-    print(f"Final feature count: {len(X_train_final.columns)}")
     
     return X_train_final, X_test_final
 
@@ -276,14 +261,11 @@ def prepare_training_data(
 ):
     """full pipeline to prepare train/test datasets with engineered features"""
     
-    print("Starting data preparation pipeline...")
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     
     # step 1: load outfit ratings
-    print("Loading outfit ratings...")
     df = pd.read_csv(ratings_file)
-    print(f"Loaded {len(df)} outfit combinations")
     
     # step 2: use the modular feature engine
     from src.feature_extraction.engineered_features import OutfitFeatureEngine
@@ -300,7 +282,6 @@ def prepare_training_data(
     y = (df['rating'] >= 4).astype(int)
     
     # step 4: train/test split
-    print(f"Splitting data: {100*(1-test_size):.0f}% train, {100*test_size:.0f}% test")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
     
     # step 5: save everything
@@ -317,8 +298,7 @@ def prepare_training_data(
     # save the feature transformer
     engine.save_transformer("models/feature_transformer.pkl")
     
-    print(f"Saved ML-ready datasets to {output_dir}/")
-    print(f"Features: {X_train.shape[1]} columns")
-    print(f"Positive samples: {y_train.sum()}/{len(y_train)} train, {y_test.sum()}/{len(y_test)} test")
+    print(f"features: {X_train.shape[1]} columns")
+    print(f"positive samples: {y_train.sum()}/{len(y_train)} train, {y_test.sum()}/{len(y_test)} test")
     
     return X_train, X_test, y_train, y_test

@@ -225,7 +225,7 @@ def batch_preprocess(input_dir, bg_removed_dir, fully_processed_dir):
     for ext in image_extensions:
         image_files.extend(input_path.glob(f'*{ext}'))
     
-    print(f"Found {len(image_files)} images to check")
+    print(f"found: {len(image_files)} clothes to check")
     
     processed_count = 0
     skipped_count = 0
@@ -237,10 +237,8 @@ def batch_preprocess(input_dir, bg_removed_dir, fully_processed_dir):
         
         # check if both versions already exist
         if bg_removed_file.exists() and fully_processed_file.exists():
-            print(f"Skipping {img_file.name} - already processed")
             skipped_count += 1
         else:
-            print(f"Processing {img_file.name}...")
             bg_removed, fully_processed = preprocess_clothing_image_stages(
                 img_file, 
                 bg_removed_file, 
@@ -248,5 +246,5 @@ def batch_preprocess(input_dir, bg_removed_dir, fully_processed_dir):
             )
             processed_count += 1
     
-    print(f"Processed: {processed_count} new images")
-    print(f"Skipped: {skipped_count} already done")
+    print(f"processed: {processed_count} new clothes")
+    print(f"skipped: {skipped_count} clothes already done")

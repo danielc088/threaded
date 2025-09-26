@@ -24,7 +24,7 @@ class OutfitRecommendationModel:
             random_state=random_state,
             n_jobs=-1
         )
-        self.threshold = 0.38  # optimized threshold for precision/recall balance
+        self.threshold = 0.45 
         self.feature_names = None
         self.is_fitted = False
     
@@ -32,17 +32,13 @@ class OutfitRecommendationModel:
         """load preprocessed training and test datasets"""
         data_path = Path(data_dir)
         
-        print("Loading training datasets...")
         self.X_train = pd.read_csv(data_path / "train_features.csv")
         self.X_test = pd.read_csv(data_path / "test_features.csv")  
         self.y_train = pd.read_csv(data_path / "train_labels.csv").iloc[:, 0]  # first column
         self.y_test = pd.read_csv(data_path / "test_labels.csv").iloc[:, 0]
         
         self.feature_names = self.X_train.columns.tolist()
-        
-        print(f"Training data: {self.X_train.shape[0]} samples, {self.X_train.shape[1]} features")
-        print(f"Test data: {self.X_test.shape[0]} samples")
-        print(f"Positive class distribution: {self.y_train.mean():.2%} train, {self.y_test.mean():.2%} test")
+    
         
         return self.X_train, self.X_test, self.y_train, self.y_test
     
@@ -54,13 +50,10 @@ class OutfitRecommendationModel:
         if y_train is None:
             y_train = self.y_train
         
-        print("Training random forest model...")
-        print(f"Using {self.model.n_estimators} trees with max depth {self.model.max_depth}")
         
         self.model.fit(X_train, y_train)
         self.is_fitted = True
         
-        print("Training completed!")
         return self
     
     def predict_proba(self, X):
@@ -106,22 +99,20 @@ class OutfitRecommendationModel:
         
         if show_details:
             print(f"Model Evaluation (threshold = {self.threshold})")
-            print("=" * 50)
-            print(f"Train Accuracy: {train_accuracy:.3f}")
-            print(f"Test Accuracy:  {test_accuracy:.3f}")
+            print(f"train Accuracy: {train_accuracy:.3f}")
+            print(f"test Accuracy:  {test_accuracy:.3f}")
             print()
-            print("Test Set Classification Report:")
             print(classification_report(y_test, y_test_pred))
             print()
-            print("Test Set Confusion Matrix:")
-            print("Predicted:  0   1")
+            print("test set confusion matrix:")
+            print("predicted:  0   1")
             cm = confusion_matrix(y_test, y_test_pred)
-            print(f"Actual 0: [{cm[0,0]:3d} {cm[0,1]:3d}]")
-            print(f"Actual 1: [{cm[1,0]:3d} {cm[1,1]:3d}]")
+            print(f"actual 0: [{cm[0,0]:3d} {cm[0,1]:3d}]")
+            print(f"actual 1: [{cm[1,0]:3d} {cm[1,1]:3d}]")
         
         return results
     
-    def get_feature_importance(self, top_n=10):
+    def get_feature_importance(self, top_n=5):
         """analyze which features are most important for outfit recommendations"""
         
         if not self.is_fitted:
@@ -133,8 +124,7 @@ class OutfitRecommendationModel:
             index=self.feature_names
         ).sort_values(ascending=False)
         
-        print(f"Top {top_n} Most Important Features:")
-        print("=" * 50)
+        print(f"top {top_n} features:")
         for i, (feature, importance) in enumerate(importances.head(top_n).items(), 1):
             print(f"{i:2d}. {feature:35s} {importance:.4f}")
         
@@ -156,7 +146,7 @@ class OutfitRecommendationModel:
         """rank outfit combinations and return top recommendations"""
         
         if not self.is_fitted:
-            raise ValueError("Model must be trained before making recommendations")
+            raise ValueError("model must be trained before making recommendations")
         
         # get probability scores for all candidates
         scores = self.predict_proba(candidate_outfits)
@@ -177,7 +167,7 @@ class OutfitRecommendationModel:
         """save trained model to disk"""
         
         if not self.is_fitted:
-            raise ValueError("Model must be trained before saving")
+            raise ValueError("model must be trained before saving")
         
         model_path = Path(filepath)
         model_path.parent.mkdir(parents=True, exist_ok=True)
@@ -191,7 +181,6 @@ class OutfitRecommendationModel:
         with open(model_path, 'wb') as f:
             pickle.dump(model_data, f)
         
-        print(f"Model saved to {filepath}")
     
     def load_model(self, filepath="models/outfit_recommender.pkl"):
         """load trained model from disk"""
@@ -204,15 +193,10 @@ class OutfitRecommendationModel:
         self.feature_names = model_data['feature_names']
         self.is_fitted = True
         
-        print(f"Model loaded from {filepath}")
-        print(f"Features: {len(self.feature_names)}, Threshold: {self.threshold}")
-
 
 def train_outfit_model(data_dir="data/training", save_path="models/outfit_score.pkl"):
     """convenience function to train and save the outfit recommendation model"""
-    
-    print("Training Outfit Recommendation Model")
-    print("=" * 50)
+
     
     # initialize and train model
     model = OutfitRecommendationModel()
@@ -236,9 +220,6 @@ def train_outfit_model(data_dir="data/training", save_path="models/outfit_score.
 def evaluate_model_variants(data_dir="data/training"):
     """test different hyperparameter combinations to find best model"""
     
-    print("Evaluating Model Variants")
-    print("=" * 50)
-    
     # test different configurations
     variants = [
         {'n_estimators': 300, 'max_depth': 4, 'class_weight': {0: 1, 1: 2}},
@@ -250,7 +231,6 @@ def evaluate_model_variants(data_dir="data/training"):
     results = []
     
     for i, params in enumerate(variants, 1):
-        print(f"\\nVariant {i}: {params}")
         
         model = OutfitRecommendationModel(**params)
         model.load_training_data(data_dir)
@@ -259,16 +239,13 @@ def evaluate_model_variants(data_dir="data/training"):
         eval_results = model.evaluate(show_details=False)
         eval_results.update(params)
         results.append(eval_results)
-        
-        print(f"Train: {eval_results['train_accuracy']:.3f}, Test: {eval_results['test_accuracy']:.3f}")
     
     # find best model
     results_df = pd.DataFrame(results)
     best_idx = results_df['test_accuracy'].idxmax()
     best_params = results_df.iloc[best_idx]
-    
-    print(f"\\nBest Model Configuration:")
-    print(f"Test Accuracy: {best_params['test_accuracy']:.3f}")
-    print(f"Parameters: {best_params[['n_estimators', 'max_depth', 'class_weight']].to_dict()}")
+
+    print(f"test accuracy: {best_params['test_accuracy']:.3f}")
+    print(f"parameters: {best_params[['n_estimators', 'max_depth', 'class_weight']].to_dict()}")
     
     return results_df

@@ -86,7 +86,7 @@ def extract_genai_features(image_path: str) -> dict:
 def process_wardrobe_genai(input_dir: str, output_csv: str):
     """
     extract generative ai features for all images in a folder.
-    save results to a CSV file.
+    skips items that are already in the output CSV.
     """
     input_path = Path(input_dir)
     image_files = list(input_path.glob("*_processed.png"))
@@ -95,27 +95,46 @@ def process_wardrobe_genai(input_dir: str, output_csv: str):
         print("No processed images found in", input_dir)
         return
 
-    wardrobe_data = []
+    print(f"Found {len(image_files)} processed images to analyse")
+
+    # load existing CSV if it exists
+    if Path(output_csv).exists():
+        existing_df = pd.read_csv(output_csv)
+        existing_ids = set(existing_df["clothing_id"].astype(str).tolist())
+        wardrobe_data = existing_df.to_dict("records")
+        print(f"Loaded {len(existing_ids)} existing records from {output_csv}")
+    else:
+        existing_ids = set()
+        wardrobe_data = []
+
+    # process new images only
+    new_rows = []
     for img_file in image_files:
         clothing_id = img_file.name.replace("_processed.png", "")
+
+        if clothing_id in existing_ids:
+            print(f"Skipping {clothing_id} (already in CSV)")
+            continue
+
+        print(f"Extracting GenAI features from {img_file.name}...")
         features = extract_genai_features(str(img_file))
         row = {"clothing_id": clothing_id, **features}
-        wardrobe_data.append(row)
+        new_rows.append(row)
 
-    # convert to df
-    df = pd.DataFrame(wardrobe_data)
+    # append new rows
+    if new_rows:
+        wardrobe_data.extend(new_rows)
+        df = pd.DataFrame(wardrobe_data)
+        df.to_csv(output_csv, index=False)
+        print(f"\nAdded {len(new_rows)} new items. Saved to {output_csv}")
+    else:
+        df = pd.DataFrame(wardrobe_data)
+        print("\nNo new items to process, CSV left unchanged.")
 
-    # save
-    df.to_csv(output_csv, index=False)
+    print(f"Total clothing items in CSV: {len(df)}")
 
-    print(f"\nGenAI features extracted and saved to {output_csv}")
-    print(f"Processed {len(df)} clothing items")
-    print("\nPreview:")
+    # preview
+    print("\nPreview of GenAI features:")
     print(df.head())
 
     return df
-
-
-if __name__ == "__main__":
-    # Example usage
-    process_wardrobe_genai("data/processed_images", "genai_features.csv")

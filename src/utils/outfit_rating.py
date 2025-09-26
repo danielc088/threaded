@@ -55,6 +55,5 @@ def rate_outfits(
 
     return df
 
-
 if __name__ == "__main__":
     rate_outfits()

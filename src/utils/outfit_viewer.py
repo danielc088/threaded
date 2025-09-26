@@ -93,8 +93,8 @@ def display_outfit_from_dict(outfit_dict, image_type="bg_removed"):
     
     # display score and any fixed item info
     if 'score' in outfit_dict:
-        print(f"outfit score: {outfit_dict['score']:.3f}")
-    
+        print(f"outfit score: {outfit_dict['score']*100:.1f}%")
+
     if 'fixed_item' in outfit_dict:
         print(f"built around: {outfit_dict['fixed_item']}")
     
@@ -102,7 +102,8 @@ def display_outfit_from_dict(outfit_dict, image_type="bg_removed"):
     
 def get_outfit_choice(generator):
     """handle user input for outfit recommendation type"""
-    print("\n" + "="*91)
+    width = 91
+    print("\n" + "="*width)
     print(r"""
          _______  __   __  ______    _______  _______  ______   _______  ______  
         |       ||  | |  ||    _ |  |       ||   _   ||      | |       ||      | 
@@ -111,14 +112,15 @@ def get_outfit_choice(generator):
           |   |  |       ||    __  ||    ___||       || |_|   ||    ___|| |_|   |
           |   |  |   _   ||   |  | ||   |___ |   _   ||       ||   |___ |       |
           |___|  |__| |__||___|  |_||_______||__| |__||______| |_______||______| 
-    """)
-    print("="*91)
-    print("\nchoose an outfit option:")
-    print("1. random outfit")
-    print("2. chosen item outfit")
+    """.center(width))
+    print("a project by daniel cao".center(width))
+    print("="*width)
+    print("\nchoose an outfit creation option:")
+    print("  • 1. Random outfit")
+    print("  • 2. Outfit with chosen item")
     
     while True:
-        choice = input("enter option (1/2): ").strip()
+        choice = input("enter option (1 or 2): ").strip()
         
         if choice == "1":
             return generator.get_random_outfit()
@@ -126,21 +128,21 @@ def get_outfit_choice(generator):
         elif choice == "2":
             # get item type
             while True:
-                item_type = input("Pick item type (shirt/pants/shoes): ").strip().lower()
+                item_type = input("pick item type (shirt/pants/shoes): ").strip().lower()
                 if item_type in ['shirt', 'pants', 'shoes']:
                     break
-                print("Please enter 'shirt', 'pants', or 'shoes'")
+                print("please enter 'shirt', 'pants', or 'shoes' only")
             
             # show available items
             if generator.wardrobe_items is None:
                 generator.load_wardrobe_items()
-            
-            available_items = generator.wardrobe_items[f"{item_type}s"]
-            print(f"Available {item_type}s: {', '.join(available_items)}")
+
+            available_items = generator.wardrobe_items[f"{item_type}"]
+            print(f"available {item_type}: {', '.join(available_items)}")
             
             # get specific item
             while True:
-                item_id = input(f"Eeter the {item_type} id: ").strip()
+                item_id = input(f"enter the {item_type} id: ").strip()
                 if item_id in available_items:
                     break
                 print(f"'{item_id}' not found. available options: {', '.join(available_items)}")
@@ -148,4 +150,4 @@ def get_outfit_choice(generator):
             return generator.complete_outfit(item_type, item_id)
         
         else:
-            print("please enter 1 or 2")
+            print("please enter 1 or 2 only")

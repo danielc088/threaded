@@ -13,7 +13,6 @@ from src.utils.outfit_viewer import display_outfit_from_dict, get_outfit_choice
 from src.recommender.outfit_generator import OutfitGenerator
 
 
-
 def main():
     """run the full wardrobe digitization pipeline"""
     
@@ -85,8 +84,6 @@ def main():
                 
         except Exception as e:
             print(f"error generating outfit: {e}")
-            print("make sure you have a trained model (set TRAIN_MODEL=True)")
-
 
 if __name__ == "__main__":
     main()

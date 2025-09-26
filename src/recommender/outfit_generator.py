@@ -39,7 +39,7 @@ class OutfitGenerator:
         pants = [item for item in cv_features['clothing_id'] if item.startswith('pants_')]
         shoes = [item for item in cv_features['clothing_id'] if item.startswith('shoes_')]
 
-        self.wardrobe_items = {'shirts': shirts, 'pants': pants, 'shoes': shoes}
+        self.wardrobe_items = {'shirt': shirts, 'pants': pants, 'shoes': shoes}
         return self.wardrobe_items
 
     def generate_all_combinations(self):
@@ -48,7 +48,7 @@ class OutfitGenerator:
             self.load_wardrobe_items()
 
         combinations = list(itertools.product(
-            self.wardrobe_items['shirts'],
+            self.wardrobe_items['shirt'],
             self.wardrobe_items['pants'],
             self.wardrobe_items['shoes']
         ))
@@ -111,21 +111,24 @@ class OutfitGenerator:
         if item_column not in self.scored_combinations.columns:
             raise ValueError(f"invalid item type: {item_type}. must be 'shirt', 'pants', or 'shoes'")
 
-        matching_outfits = self.scored_combinations[
-            self.scored_combinations[item_column] == item_id
-        ].sort_values('recommendation_score', ascending=False)
+        threshold_prob = self.model.threshold if hasattr(self.model, 'threshold') else self.score_threshold
 
+        matching_outfits = self.scored_combinations[
+            (self.scored_combinations[item_column] == item_id) &
+            (self.scored_combinations['recommendation_score'] >= threshold_prob)
+        ]
+        
         if len(matching_outfits) == 0:
             print(f"no outfits found including {item_id}")
             return None
 
-        # return top-scoring outfit with this item
-        best_outfit = matching_outfits.iloc[0]
+        # return random outfit
+        best_outfit = matching_outfits.sample(n=1).iloc[0]
         
         return {
             'shirt': best_outfit['shirt_id'],
             'pants': best_outfit['pants_id'],
             'shoes': best_outfit['shoes_id'],
             'score': best_outfit['recommendation_score'],
-            'fixed_item': f"{item_type}: {item_id}"
+            'fixed_item': f"{item_id}"
         }

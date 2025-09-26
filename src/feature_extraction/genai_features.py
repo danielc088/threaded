@@ -113,7 +113,7 @@ def process_wardrobe_genai(input_dir: str, output_csv: str):
         clothing_id = img_file.name.replace("_processed.png", "")
 
         if clothing_id in existing_ids:
-            print(f"Skipping {clothing_id} (already in CSV)")
+            print(f"Skipping {clothing_id} already in CSV")
             continue
 
         print(f"Extracting GenAI features from {img_file.name}...")

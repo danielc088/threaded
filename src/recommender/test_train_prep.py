@@ -6,8 +6,6 @@ creates train/test splits with engineered features for the random forest model
 
 import pandas as pd
 import numpy as np
-if not hasattr(np, "asscalar"):
-    np.asscalar = lambda x: x.item()
 import json
 import warnings
 from pathlib import Path
@@ -18,7 +16,9 @@ from colormath.color_diff import delta_e_cie2000
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import PolynomialFeatures
 
+# suppress pandas future warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
+
 
 def load_and_merge_data(ratings_file, cv_features_file, genai_features_file):
     """load outfit ratings and merge with both CV and GenAI features for each clothing item"""
@@ -73,7 +73,10 @@ def create_categorical_features(df):
     
     if categorical_cols:
         print(f"One-hot encoding {len(categorical_cols)} categorical columns...")
-        df = pd.get_dummies(df, columns=categorical_cols, dummy_na=True)
+        # Use the new pandas syntax to avoid future warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=FutureWarning)
+            df = pd.get_dummies(df, columns=categorical_cols, dummy_na=True)
     
     return df
 
@@ -277,58 +280,45 @@ def prepare_training_data(
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     
-    # step 1: load and merge all data sources
-    df = load_and_merge_data(ratings_file, cv_features_file, genai_features_file)
+    # step 1: load outfit ratings
+    print("Loading outfit ratings...")
+    df = pd.read_csv(ratings_file)
+    print(f"Loaded {len(df)} outfit combinations")
     
-    # step 2: create categorical features
-    df = create_categorical_features(df)
+    # step 2: use the modular feature engine
+    from src.feature_extraction.engineered_features import OutfitFeatureEngine
+
+    df_features = df.drop(columns=['rating'])
+    engine = OutfitFeatureEngine(palettes_file)
     
-    # step 3: create colour palette features
-    df = create_palette_features(df, palettes_file)
+    # prepare features using the modular pipeline
+    X = engine.prepare_outfit_features(
+        df_features, cv_features_file, genai_features_file, for_training=True
+    )
     
-    # step 4: create pairwise combination features
-    df = create_pairwise_features(df)
+    # step 3: prepare labels (4+ stars = good outfit)
+    y = (df['rating'] >= 4).astype(int)
     
-    # step 5: create colour similarity features
-    df = create_colour_similarity_features(df)
-    
-    # step 6: create LAB colour features
-    df = create_lab_colour_features(df)
-    
-    # step 7: train/test split
+    # step 4: train/test split
     print(f"Splitting data: {100*(1-test_size):.0f}% train, {100*test_size:.0f}% test")
-    train_set, test_set = train_test_split(df, test_size=test_size, random_state=random_state)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
     
-    # save raw train/test sets
-    train_set.to_csv(output_path / "train_raw.csv", index=False)
-    test_set.to_csv(output_path / "test_raw.csv", index=False)
-    print(f"Saved raw datasets: {len(train_set)} train, {len(test_set)} test samples")
-    
-    # step 8: prepare features and labels for ML
-    drop_cols = [
-        "shirt_id", "pants_id", "shoes_id", "rating",
-        "shirt_dominant_colours", "pants_dominant_colours", "shoes_dominant_colours",
-        "closest_palette", "pair_shirt_pants", "pair_shirt_shoes", "pair_pants_shoes"
-    ]
-    
-    X_train = train_set.drop(columns=drop_cols)
-    X_test = test_set.drop(columns=drop_cols)
-    
-    # convert ratings to binary classification (4+ stars = good outfit)
-    y_train = (train_set['rating'] >= 4).astype(int)
-    y_test = (test_set['rating'] >= 4).astype(int)
-    
-    # step 9: create polynomial interaction features
-    X_train_final, X_test_final = create_polynomial_features(X_train, X_test)
-    
-    # step 10: save processed datasets
-    X_train_final.to_csv(output_path / "train_features.csv", index=False)
-    X_test_final.to_csv(output_path / "test_features.csv", index=False)
+    # step 5: save everything
+    X_train.to_csv(output_path / "train_features.csv", index=False)
+    X_test.to_csv(output_path / "test_features.csv", index=False)
     y_train.to_csv(output_path / "train_labels.csv", index=False)
     y_test.to_csv(output_path / "test_labels.csv", index=False)
     
+    # also save the raw data with train/test split for reference
+    train_indices, test_indices = train_test_split(df.index, test_size=test_size, random_state=random_state)
+    df.loc[train_indices].to_csv(output_path / "train_raw.csv", index=False)
+    df.loc[test_indices].to_csv(output_path / "test_raw.csv", index=False)
+    
+    # save the feature transformer
+    engine.save_transformer("models/feature_transformer.pkl")
+    
     print(f"Saved ML-ready datasets to {output_dir}/")
-    print(f"Features: {X_train_final.shape[1]} columns")
+    print(f"Features: {X_train.shape[1]} columns")
     print(f"Positive samples: {y_train.sum()}/{len(y_train)} train, {y_test.sum()}/{len(y_test)} test")
     
-    return X_train_final, X_test_final, y_train, y_test
+    return X_train, X_test, y_train, y_test

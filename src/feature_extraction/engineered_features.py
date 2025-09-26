@@ -266,7 +266,7 @@ class OutfitFeatureEngine:
         """full feature engineering pipeline for outfit combinations with caching"""
         
         if cache_file is None:
-            cache_file = "data/cache/engineered_features.csv"
+            cache_file = "data/supporting/engineered_features.csv"
         
         cache_path = Path(cache_file)
         

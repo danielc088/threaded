@@ -5,6 +5,7 @@ supports both background-removed and processed versions
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+import math
 from pathlib import Path
 
 
@@ -72,6 +73,35 @@ def display_outfit(shirt_id, pants_id, shoes_id, image_type="bg_removed", figsiz
     plt.tight_layout()
     plt.show()
 
+def show_items_grid(item_type, items, image_dir="data/wardrobe/bg_removed", suffix="_bg_removed.png", columns=5):
+    """
+    display clothing items in a grid with numbers for selection
+    """
+    items = sorted(items)
+    n_items = len(items)
+    rows = math.ceil(n_items / columns)
+    
+    fig, axes = plt.subplots(rows, columns, figsize=(columns*2, rows*2))
+    axes = axes.flatten()
+    
+    for i, item_id in enumerate(items):
+        img_path = Path(image_dir) / f"{item_id}{suffix}"
+        if img_path.exists():
+            img = plt.imread(str(img_path))
+            axes[i].imshow(img)
+            axes[i].axis('off')
+            axes[i].set_title(f"{i+1}", fontsize=8)
+        else:
+            axes[i].axis('off')
+            axes[i].set_title(f"missing\n{i+1}", fontsize=8)
+    
+    # hide empty subplots
+    for j in range(i+1, len(axes)):
+        axes[j].axis('off')
+    
+    plt.suptitle(f"Select a {item_type} by number", fontsize=12)
+    plt.tight_layout()
+    plt.show()
 
 def display_outfit_from_dict(outfit_dict, image_type="bg_removed"):
     """
@@ -133,19 +163,26 @@ def get_outfit_choice(generator):
                     break
                 print("please enter 'shirt', 'pants', or 'shoes' only")
             
-            # show available items
+            # ensure wardrobe items are loaded
             if generator.wardrobe_items is None:
                 generator.load_wardrobe_items()
-
-            available_items = generator.wardrobe_items[f"{item_type}"]
-            print(f"available {item_type}: {', '.join(available_items)}")
             
-            # get specific item
+            available_items = sorted(generator.wardrobe_items[f"{item_type}"])
+            
+            # show items visually in grid
+            show_items_grid(item_type, available_items)
+            
+            # get selection by number
             while True:
-                item_id = input(f"enter the {item_type} id: ").strip()
-                if item_id in available_items:
-                    break
-                print(f"'{item_id}' not found. available options: {', '.join(available_items)}")
+                try:
+                    selection = int(input(f"select {item_type} by number (1-{len(available_items)}): "))
+                    if 1 <= selection <= len(available_items):
+                        item_id = available_items[selection - 1]
+                        break
+                    else:
+                        print(f"please enter a number between 1 and {len(available_items)}")
+                except ValueError:
+                    print("please enter a valid number")
             
             return generator.complete_outfit(item_type, item_id)
         

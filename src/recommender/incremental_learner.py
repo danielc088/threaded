@@ -1,6 +1,7 @@
 """
-Incremental learning system for outfit recommendations
-Handles both initial model training and continuous improvement
+incremental learning system for outfit recommendations
+handles both initial model training and continuous improvement
+basically lets the model get smarter as you rate more outfits
 """
 
 import pandas as pd
@@ -12,7 +13,7 @@ from sklearn.metrics import accuracy_score
 
 
 class IncrementalOutfitLearner:
-    """Manages incremental model training and prediction caching"""
+    """manages incremental model training and prediction caching"""
     
     def __init__(self, user_id, db):
         self.user_id = user_id
@@ -23,17 +24,17 @@ class IncrementalOutfitLearner:
         self.retrain_threshold = 10  # retrain after N new ratings
         
     def get_current_model_version(self):
-        """Get the active model version for this user"""
+        """get the active model version for this user"""
         model_info = self.db.get_active_model_version(self.user_id)
         return model_info['version'] if model_info else None
     
     def should_retrain_model(self):
-        """Determine if model needs retraining based on new ratings"""
+        """determine if model needs retraining based on new ratings"""
         current_version = self.get_current_model_version()
         if not current_version:
-            return True  # No model exists
+            return True  # no model exists
             
-        # Count ratings since last model training
+        # count ratings since last model training
         last_training = self.db.execute_query("""
             SELECT trained_at FROM model_versions 
             WHERE user_id = ? AND version = ?
@@ -50,11 +51,11 @@ class IncrementalOutfitLearner:
         return new_ratings[0]['count'] >= self.retrain_threshold
     
     def get_cached_features(self, outfit_hashes):
-        """Retrieve cached engineered features for outfit combinations"""
+        """retrieve cached engineered features for outfit combinations"""
         if not outfit_hashes:
             return {}
             
-        # Convert list to comma-separated placeholders
+        # convert list to comma-separated placeholders
         placeholders = ','.join(['?'] * len(outfit_hashes))
         
         cached = self.db.execute_query(f"""
@@ -63,7 +64,7 @@ class IncrementalOutfitLearner:
             AND outfit_hash IN ({placeholders})
         """, [self.user_id, self.feature_version] + outfit_hashes)
         
-        # Deserialize features
+        # deserialise features
         cache_dict = {}
         for row in cached:
             cache_dict[row['outfit_hash']] = pickle.loads(row['feature_blob'])
@@ -71,7 +72,7 @@ class IncrementalOutfitLearner:
         return cache_dict
     
     def cache_features(self, outfit_hash, features):
-        """Store engineered features for future use"""
+        """store engineered features for future use"""
         feature_blob = pickle.dumps(features)
         
         self.db.execute_query("""
@@ -81,7 +82,7 @@ class IncrementalOutfitLearner:
         """, (self.user_id, outfit_hash, feature_blob, self.feature_version))
     
     def get_cached_predictions(self, outfit_hashes, model_version=None):
-        """Retrieve cached model predictions"""
+        """retrieve cached model predictions"""
         if not model_version:
             model_version = self.get_current_model_version()
         if not model_version or not outfit_hashes:
@@ -98,7 +99,7 @@ class IncrementalOutfitLearner:
         return {row['outfit_hash']: row['predicted_rating'] for row in cached}
     
     def cache_predictions(self, predictions_dict, model_version):
-        """Store model predictions for future use"""
+        """store model predictions for future use"""
         for outfit_hash, prediction in predictions_dict.items():
             self.db.execute_query("""
                 INSERT OR REPLACE INTO outfit_predictions
@@ -107,20 +108,20 @@ class IncrementalOutfitLearner:
             """, (self.user_id, outfit_hash, model_version, float(prediction)))
     
     def train_or_update_model(self, force_retrain=False):
-        """Train new model or update existing one based on available ratings"""
+        """train new model or update existing one based on available ratings"""
         ratings = self.db.get_all_ratings(self.user_id)
         
         if len(ratings) < self.min_ratings_for_training:
-            print(f"Need at least {self.min_ratings_for_training} ratings to train model")
+            print(f"need at least {self.min_ratings_for_training} ratings to train model")
             return None
             
         if not force_retrain and not self.should_retrain_model():
-            print("Model is up to date, no retraining needed")
+            print("model is up to date, no retraining needed")
             return self.get_current_model_version()
         
-        print(f"Training model with {len(ratings)} ratings...")
+        print(f"training model with {len(ratings)} ratings...")
         
-        # Prepare training data
+        # prepare training data
         training_data = pd.DataFrame([{
             'shirt_id': r['shirt_id'],
             'pants_id': r['pants_id'], 
@@ -130,21 +131,21 @@ class IncrementalOutfitLearner:
         
         training_data['rating_binary'] = (training_data['rating'] >= 4).astype(int)
         
-        # Feature engineering with caching
+        # feature engineering with caching
         X = self.prepare_features_with_cache(training_data)
         y = training_data['rating_binary']
         
-        # Train model
+        # train model
         from src.recommender.random_forest import OutfitRecommendationModel
         model = OutfitRecommendationModel()
         model.train(X, y)
         
-        # Create new model version
+        # create new model version
         model_version = f"v{len(ratings)}_{datetime.now().strftime('%Y%m%d_%H%M')}"
         model_path = f"models/outfit_recommender_{self.user_id}_{model_version}.pkl"
         model.save_model(model_path)
         
-        # Calculate accuracy (simple holdout)
+        # calculate accuracy (simple holdout)
         if len(ratings) >= 10:
             from sklearn.model_selection import train_test_split
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -155,76 +156,76 @@ class IncrementalOutfitLearner:
         else:
             accuracy = None
         
-        # Save model metadata
+        # save model metadata
         self.db.execute_query("""
             INSERT INTO model_versions 
             (user_id, version, training_samples, accuracy_score, feature_count, model_path)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (self.user_id, model_version, len(ratings), accuracy, len(X.columns), model_path))
         
-        # Deactivate old models
+        # deactivate old models
         self.db.execute_query("""
             UPDATE model_versions SET is_active = FALSE 
             WHERE user_id = ? AND version != ?
         """, (self.user_id, model_version))
         
-        # Clear old predictions cache since model changed
+        # clear old predictions cache since model changed
         self.clear_prediction_cache()
         
         self.current_model_version = model_version
-        print(f"Trained new model: {model_version}")
+        print(f"trained new model: {model_version}")
         if accuracy:
-            print(f"Model accuracy: {accuracy:.3f}")
+            print(f"model accuracy: {accuracy:.3f}")
             
         return model_version
     
     def prepare_features_with_cache(self, outfit_df):
-        """Prepare features using cache when possible"""
-        # Generate outfit hashes
+        """prepare features using cache when possible"""
+        # generate outfit hashes
         outfit_df['outfit_hash'] = (outfit_df['shirt_id'] + '_' + 
                                   outfit_df['pants_id'] + '_' + 
                                   outfit_df['shoes_id'])
         
-        # Check cache for existing features
+        # check cache for existing features
         cached_features = self.get_cached_features(outfit_df['outfit_hash'].tolist())
         
-        # Identify which outfits need feature computation
+        # identify which outfits need feature computation
         missing_hashes = [h for h in outfit_df['outfit_hash'] if h not in cached_features]
         
         if missing_hashes:
-            print(f"Computing features for {len(missing_hashes)} new outfit combinations...")
+            print(f"computing features for {len(missing_hashes)} new outfit combinations...")
             
-            # Compute features for missing outfits
+            # compute features for missing outfits
             missing_df = outfit_df[outfit_df['outfit_hash'].isin(missing_hashes)].copy()
             
             from src.feature_extraction.feature_engineering import OutfitFeatureEngine
             engine = OutfitFeatureEngine(self.user_id, self.db)
             X_missing = engine.prepare_outfit_features(missing_df, for_training=True)
             
-            # Cache the new features
+            # cache the new features
             for hash_val, features in zip(missing_hashes, X_missing.values):
                 self.cache_features(hash_val, features)
                 cached_features[hash_val] = features
         
-        # Reconstruct full feature matrix
+        # reconstruct full feature matrix
         feature_matrix = []
         for hash_val in outfit_df['outfit_hash']:
             feature_matrix.append(cached_features[hash_val])
         
-        # Convert to DataFrame
+        # convert to dataframe
         if missing_hashes:
-            # Use column names from recent computation
+            # use column names from recent computation
             feature_names = X_missing.columns.tolist()
         else:
-            # Fallback feature names
+            # fallback feature names
             feature_names = [f"feat_{i}" for i in range(len(feature_matrix[0]))]
         
         X = pd.DataFrame(feature_matrix, columns=feature_names, index=outfit_df.index)
         return X
     
     def predict_with_cache(self, outfit_combinations):
-        """Get predictions using cache when possible"""
-        # Generate hashes
+        """get predictions using cache when possible"""
+        # generate hashes
         outfit_hashes = []
         for _, row in outfit_combinations.iterrows():
             hash_val = f"{row['shirt_id']}_{row['pants_id']}_{row['shoes_id']}"
@@ -232,47 +233,41 @@ class IncrementalOutfitLearner:
         
         model_version = self.get_current_model_version()
         if not model_version:
-            print("No trained model available")
+            print("no trained model available")
             return np.random.uniform(0.3, 0.7, len(outfit_combinations))
         
-        # Check prediction cache
+        # check prediction cache
         cached_predictions = self.get_cached_predictions(outfit_hashes, model_version)
         
-        # Identify outfits needing prediction
+        # identify outfits needing prediction
         missing_hashes = [h for h in outfit_hashes if h not in cached_predictions]
         
         if missing_hashes:
-            print(f"Computing predictions for {len(missing_hashes)} outfit combinations...")
+            print(f"computing predictions for {len(missing_hashes)} outfit combinations...")
             
-            # Load model
+            # load model
             from src.recommender.random_forest import OutfitRecommendationModel
             model = OutfitRecommendationModel()
             model_path = f"models/outfit_recommender_{self.user_id}_{model_version}.pkl"
             model.load_model(model_path)
             
-            # Get features for missing predictions
-            missing_df = outfit_combinations[
-                [f"{h.split('_')[0]}_{h.split('_')[1]}_{h.split('_')[2]}" in missing_hashes 
-                 for h in outfit_hashes]
-            ].copy()
-            
-            # This is a bit tricky - need to reconstruct the missing_df properly
+            # get features for missing predictions
             missing_indices = [i for i, h in enumerate(outfit_hashes) if h in missing_hashes]
             missing_df = outfit_combinations.iloc[missing_indices].copy()
             
             X_missing = self.prepare_features_with_cache(missing_df)
             predictions_missing = model.predict_proba(X_missing)
             
-            # Cache new predictions
+            # cache new predictions
             new_predictions = dict(zip(missing_hashes, predictions_missing))
             self.cache_predictions(new_predictions, model_version)
             cached_predictions.update(new_predictions)
         
-        # Return predictions in original order
+        # return predictions in original order
         return [cached_predictions[h] for h in outfit_hashes]
     
     def clear_prediction_cache(self, model_version=None):
-        """Clear cached predictions (e.g., when model is retrained)"""
+        """clear cached predictions (e.g., when model is retrained)"""
         if model_version:
             self.db.execute_query("""
                 DELETE FROM outfit_predictions 
@@ -284,7 +279,7 @@ class IncrementalOutfitLearner:
             """, (self.user_id,))
         
     def clear_feature_cache(self):
-        """Clear feature cache (e.g., when feature engineering changes)"""
+        """clear feature cache (e.g., when feature engineering changes)"""
         self.db.execute_query("""
             DELETE FROM outfit_features WHERE user_id = ? AND feature_version = ?
         """, (self.user_id, self.feature_version))

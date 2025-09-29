@@ -1,7 +1,7 @@
 """
 preprocessing pipeline for uploaded clothing images
 takes raw jpg photos and makes them consistent for feature extraction
-handles background removal, color enhancement, and standardization
+handles background removal, colour enhancement, and standardisation
 """
 
 import cv2
@@ -19,14 +19,14 @@ def load_image(image_path):
 
 
 def detect_dark_item(img):
-    """check if this is a dark clothing item to avoid color shifting"""
+    """check if this is a dark clothing item to avoid colour shifting"""
     img_array = np.array(img)
     avg_brightness = np.mean(img_array)
     return avg_brightness < 0.5
 
 
 def enhance_for_clothing_type(img, is_dark_item=False):
-    """different enhancement based on clothing darkness to preserve colors"""
+    """different enhancement based on clothing darkness to preserve colours"""
     img_array = np.array(img)
     avg_brightness = np.mean(img_array)
     
@@ -45,7 +45,7 @@ def enhance_for_clothing_type(img, is_dark_item=False):
         contrast_enhancer = ImageEnhance.Contrast(img)
         img_contrast = contrast_enhancer.enhance(1.3)
         
-        # boost saturation to make colors pop
+        # boost saturation to make colours pop
         saturation_enhancer = ImageEnhance.Color(img_contrast)
         img_saturated = saturation_enhancer.enhance(1.5)
         
@@ -123,7 +123,7 @@ def reduce_shadows_adaptive(img_array):
         avg_brightness = np.mean(clothing_pixels)
         
         if avg_brightness < 0.3:
-            # very dark items: skip shadow processing to avoid color shifts
+            # very dark items: skip shadow processing to avoid colour shifts
             return np.concatenate([rgb, alpha[:, :, np.newaxis]], axis=2)
         
         # normal shadow processing for other items
@@ -150,7 +150,7 @@ def crop_transparent_space(img):
 
 
 def center_and_resize(img, target_size=(800, 1000), padding=50):
-    """standardize all images to same size and nicely centered"""
+    """standardise all images to same size and nicely centred"""
     
     # first get rid of excess space
     cropped = crop_transparent_space(img)
@@ -170,7 +170,7 @@ def center_and_resize(img, target_size=(800, 1000), padding=50):
     
     img_resized = padded_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
     
-    # center it in a standard canvas
+    # centre it in a standard canvas
     final_img = Image.new('RGBA', target_size, (0, 0, 0, 0))
     x_offset = (target_width - new_width) // 2
     y_offset = (target_height - new_height) // 2
@@ -185,7 +185,7 @@ def preprocess_clothing_image_stages(image_path, save_bg_removed=None, save_full
     # stage 1: load raw photo
     img = load_image(image_path)
     
-    # stage 2: background removal on raw image (preserve original colors)
+    # stage 2: background removal on raw image (preserve original colours)
     img_no_bg = remove_background(img, filename=Path(image_path).stem)
     
     # save background removed version if requested
@@ -201,7 +201,7 @@ def preprocess_clothing_image_stages(image_path, save_bg_removed=None, save_full
     img_shadow_reduced = reduce_shadows_adaptive(img_array)
     img_processed = Image.fromarray((img_shadow_reduced * 255).astype(np.uint8))
 
-    # final standardization
+    # final standardisation
     final_img = center_and_resize(img_processed)
     
     # save fully processed version if requested

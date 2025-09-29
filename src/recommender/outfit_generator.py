@@ -1,6 +1,7 @@
 """
-Database-enabled outfit generation pipeline with caching
-Uses cached features and predictions for dramatically faster recommendations
+database-enabled outfit generation pipeline with caching
+uses cached features and predictions for faster recommendations
+basically the main engine that picks what you should wear today
 """
 
 import pandas as pd
@@ -19,7 +20,7 @@ class CachedOutfitGenerator:
     """generates and scores outfit combinations with caching for speed"""
 
     def __init__(self, user_id, db):
-        """initialize with user id and database connection"""
+        """initialise with user id and database connection"""
         self.user_id = user_id
         self.db = db
         self.wardrobe_items = None
@@ -34,7 +35,7 @@ class CachedOutfitGenerator:
         # load user's model
         self.model = get_user_model(user_id, db, auto_train=True)
         if not self.model:
-            print(f"Warning: No model available for user {user_id}")
+            print(f"warning: no model available for user {user_id}")
 
     def load_wardrobe_items(self):
         """load available clothing items from database"""
@@ -88,12 +89,12 @@ class CachedOutfitGenerator:
             print("no outfit combinations to score")
             return pd.DataFrame()
 
-        # initialize scored combinations
+        # initialise scored combinations
         self.scored_combinations = self.all_combinations.copy()
         self.scored_combinations['recommendation_score'] = 0.0
         self.scored_combinations['score_source'] = 'none'
 
-        # PRIORITY 1: user ratings (highest priority - ground truth)
+        # priority 1: user ratings (highest priority - ground truth)
         user_rated_count = 0
         if use_existing_ratings:
 
@@ -111,7 +112,7 @@ class CachedOutfitGenerator:
 
             print(f"found {user_rated_count} user ratings")
 
-        # PRIORITY 2: cached ML predictions (for unrated items)
+        # priority 2: cached ml predictions (for unrated items)
         unrated_mask = self.scored_combinations['score_source'] == 'none'
         unrated_hashes = self.scored_combinations[unrated_mask]['outfit_hash'].tolist()
 
@@ -133,7 +134,7 @@ class CachedOutfitGenerator:
                         self.scored_combinations.loc[idx, 'score_source'] = 'cached_ml'
                         cached_predictions_count += 1
 
-        # PRIORITY 3: compute new ML predictions (for remaining unrated/uncached items)
+        # priority 3: compute new ml predictions (for remaining unrated/uncached items)
         still_unrated_mask = self.scored_combinations['score_source'] == 'none'
         still_unrated_count = still_unrated_mask.sum()
 
@@ -144,23 +145,22 @@ class CachedOutfitGenerator:
                         ['shirt_id', 'pants_id', 'shoes_id']
                     ].copy()
 
-                    # use the cached feature engineering
-                    # Use the feature engine directly to compute missing features on-demand
+                    # use the feature engine directly to compute missing features on-demand
                     from src.feature_extraction.feature_engineering import OutfitFeatureEngine
                     engine = OutfitFeatureEngine(self.user_id, self.db)
                     
-                    # Load transformer if it exists
+                    # load transformer if it exists
                     transformer_path = Path(f"models/user_{self.user_id}/feature_transformer.pkl")
                     if transformer_path.exists():
                         engine.load_transformer(str(transformer_path))
                     
-                    # This will use cached features when available and compute missing ones
+                    # this will use cached features when available and compute missing ones
                     X = engine.prepare_outfit_features(unrated_combinations, for_training=False)
 
-                    # get ML predictions
+                    # get ml predictions
                     ml_scores = self.model.predict_proba(X)
 
-                    # assign ML scores
+                    # assign ml scores
                     self.scored_combinations.loc[still_unrated_mask, 'recommendation_score'] = ml_scores
                     self.scored_combinations.loc[still_unrated_mask, 'score_source'] = 'new_ml'
 
@@ -179,7 +179,7 @@ class CachedOutfitGenerator:
                             self.db.save_outfit_predictions_batch(self.user_id, new_predictions, model_version)
 
                 except Exception as e:
-                    print(f"error generating ML features: {e}")
+                    print(f"error generating ml features: {e}")
                     print("using random scores as fallback")
                     random_scores = np.random.uniform(0.3, 0.7, still_unrated_count)
                     self.scored_combinations.loc[still_unrated_mask, 'recommendation_score'] = random_scores
@@ -202,7 +202,7 @@ class CachedOutfitGenerator:
                 # user rated 4 or 5 stars (≥0.8 on 0-1 scale)
                 return score >= 0.8
             else:
-                # use model threshold for ML predictions
+                # use model threshold for ml predictions
                 return score >= threshold_prob
 
         self.good_outfits = self.scored_combinations[
@@ -219,8 +219,42 @@ class CachedOutfitGenerator:
 
         return self.scored_combinations
 
-    def get_random_outfit(self, use_existing_ratings=False):
-        """get a random high-scoring outfit recommendation"""
+    def get_random_outfit(self, use_existing_ratings=False, exploration_rate=0.05):
+        """get outfit recommendation with optional random exploration"""
+        import random
+
+        # 5% chance for completely random exploration
+        if random.random() < exploration_rate:
+            return self.get_exploration_outfit()
+
+        # 95% chance for normal ml-based recommendation
+        return self.get_ml_recommended_outfit(use_existing_ratings)
+
+    def get_exploration_outfit(self):
+        """get completely random outfit for exploration (breaking filter bubble)"""
+        if not hasattr(self, 'wardrobe_items') or self.wardrobe_items is None:
+            self.load_wardrobe_items()
+
+        if not all(self.wardrobe_items.values()):
+            print("warning: missing items in some categories")
+            return None
+
+        # pick completely random items
+        import random
+        random_shirt = random.choice(self.wardrobe_items['shirt'])
+        random_pants = random.choice(self.wardrobe_items['pants'])  
+        random_shoes = random.choice(self.wardrobe_items['shoes'])
+
+        return {
+            'shirt': random_shirt,
+            'pants': random_pants,
+            'shoes': random_shoes,
+            'score': 0.5,  # neutral score since it's random
+            'score_source': 'exploration_random'
+        }
+
+    def get_ml_recommended_outfit(self, use_existing_ratings=False):
+        """get ml-based recommendation (original logic)"""
         if self.good_outfits is None or len(self.good_outfits) == 0:
             self.score_all_combinations_cached(use_existing_ratings=use_existing_ratings)
 
@@ -235,7 +269,7 @@ class CachedOutfitGenerator:
         else:
             # pick a random outfit from the good ones
             random_outfit = self.good_outfits.sample(n=1).iloc[0]
-        
+
         return {
             'shirt': random_outfit['shirt_id'],
             'pants': random_outfit['pants_id'],
@@ -244,8 +278,44 @@ class CachedOutfitGenerator:
             'score_source': random_outfit['score_source']
         }
 
-    def complete_outfit(self, item_type, item_id, use_existing_ratings=False):
-        """find best outfit combinations that include the specified item"""
+    def complete_outfit(self, item_type, item_id, use_existing_ratings=False, exploration_rate=0.05):
+        """find best outfit combinations that include the specified item with exploration"""
+        import random
+
+        # 5% chance for exploration even with fixed item
+        if random.random() < exploration_rate:
+            return self.get_exploration_outfit_with_fixed_item(item_type, item_id)
+
+        # 95% chance for normal ml-based completion
+        return self.get_ml_outfit_completion(item_type, item_id, use_existing_ratings)
+
+    def get_exploration_outfit_with_fixed_item(self, item_type, item_id):
+        """random exploration while keeping one item fixed"""
+        if not hasattr(self, 'wardrobe_items') or self.wardrobe_items is None:
+            self.load_wardrobe_items()
+
+        import random
+
+        # start with the fixed item
+        outfit = {'shirt': None, 'pants': None, 'shoes': None}
+        outfit[item_type] = item_id
+
+        # randomly pick the other items
+        for other_type in ['shirt', 'pants', 'shoes']:
+            if other_type != item_type:
+                outfit[other_type] = random.choice(self.wardrobe_items[other_type])
+
+        return {
+            'shirt': outfit['shirt'],
+            'pants': outfit['pants'],
+            'shoes': outfit['shoes'],
+            'score': 0.5,
+            'score_source': 'exploration_with_fixed',
+            'fixed_item': f"{item_id}"
+        }
+
+    def get_ml_outfit_completion(self, item_type, item_id, use_existing_ratings=False):
+        """ml-based outfit completion (original logic)"""
         if self.scored_combinations is None:
             self.score_all_combinations_cached(use_existing_ratings=use_existing_ratings)
 
@@ -263,7 +333,7 @@ class CachedOutfitGenerator:
             (self.scored_combinations[item_column] == item_id) &
             (self.scored_combinations['recommendation_score'] >= threshold_prob)
         ]
-        
+
         if len(matching_outfits) == 0:
             print(f"no high-scoring outfits found including {item_id}")
             # try with all combinations including this item
@@ -278,7 +348,7 @@ class CachedOutfitGenerator:
         else:
             # return random outfit from high-scoring matches
             best_outfit = matching_outfits.sample(n=1).iloc[0]
-        
+
         return {
             'shirt': best_outfit['shirt_id'],
             'pants': best_outfit['pants_id'],
@@ -303,14 +373,14 @@ class CachedOutfitGenerator:
         # invalidate cached scores so they get recalculated
         self.invalidate_cache()
 
-        # Also clear prediction cache since ratings changed
+        # also clear prediction cache since ratings changed
         self.db.clear_outfit_predictions(self.user_id)
 
     def invalidate_cache(self):
         """clear cached combinations and scores to force regeneration"""
         self.scored_combinations = None
         self.good_outfits = None
-        # Note: we keep database caches - those are managed by the incremental learner
+        # note: we keep database caches - those are managed by the incremental learner
     
     def clear_all_caches(self):
         """clear both memory and database caches (for debugging)"""
@@ -331,7 +401,6 @@ class CachedOutfitGenerator:
             'good_outfits': len(self.good_outfits) if self.good_outfits is not None else 0
         }
 
-    # keep the other methods for compatibility
     def get_user_stats(self):
         """get statistics about user's wardrobe and ratings"""
         return self.db.get_database_stats(self.user_id)
@@ -364,145 +433,6 @@ class CachedOutfitGenerator:
             }
         
         return None
-    
-    def get_random_outfit(self, use_existing_ratings=False, exploration_rate=0.05):
-        """get outfit recommendation with optional random exploration"""
-        import random
-
-        # 5% chance for completely random exploration
-        if random.random() < exploration_rate:
-            return self.get_exploration_outfit()
-
-        # 95% chance for normal ML-based recommendation
-        return self.get_ml_recommended_outfit(use_existing_ratings)
-
-    def get_exploration_outfit(self):
-        """get completely random outfit for exploration (breaking filter bubble)"""
-        if not hasattr(self, 'wardrobe_items') or self.wardrobe_items is None:
-            self.load_wardrobe_items()
-
-        if not all(self.wardrobe_items.values()):
-            print("warning: missing items in some categories")
-            return None
-
-        # Pick completely random items
-        import random
-        random_shirt = random.choice(self.wardrobe_items['shirt'])
-        random_pants = random.choice(self.wardrobe_items['pants'])  
-        random_shoes = random.choice(self.wardrobe_items['shoes'])
-
-        return {
-            'shirt': random_shirt,
-            'pants': random_pants,
-            'shoes': random_shoes,
-            'score': 0.5,  # neutral score since it's random
-            'score_source': 'exploration_random'
-        }
-
-    def get_ml_recommended_outfit(self, use_existing_ratings=False):
-        """get ML-based recommendation (original logic)"""
-        if self.good_outfits is None or len(self.good_outfits) == 0:
-            self.score_all_combinations_cached(use_existing_ratings=use_existing_ratings)
-
-        if len(self.good_outfits) == 0:
-            print("no high-scoring outfits found - try lowering the threshold")
-            # return a random combination as fallback
-            if len(self.scored_combinations) > 0:
-                random_outfit = self.scored_combinations.sample(n=1).iloc[0]
-                print(f"returning random outfit with score {random_outfit['recommendation_score']:.2f}")
-            else:
-                return None
-        else:
-            # pick a random outfit from the good ones
-            random_outfit = self.good_outfits.sample(n=1).iloc[0]
-
-        return {
-            'shirt': random_outfit['shirt_id'],
-            'pants': random_outfit['pants_id'],
-            'shoes': random_outfit['shoes_id'],
-            'score': random_outfit['recommendation_score'],
-            'score_source': random_outfit['score_source']
-        }
-
-    def complete_outfit(self, item_type, item_id, use_existing_ratings=False, exploration_rate=0.05):
-        """find best outfit combinations that include the specified item with exploration"""
-        import random
-
-        # 5% chance for exploration even with fixed item
-        if random.random() < exploration_rate:
-            return self.get_exploration_outfit_with_fixed_item(item_type, item_id)
-
-        # 95% chance for normal ML-based completion
-        return self.get_ml_outfit_completion(item_type, item_id, use_existing_ratings)
-
-    def get_exploration_outfit_with_fixed_item(self, item_type, item_id):
-        """random exploration while keeping one item fixed"""
-        if not hasattr(self, 'wardrobe_items') or self.wardrobe_items is None:
-            self.load_wardrobe_items()
-
-        import random
-
-        # Start with the fixed item
-        outfit = {'shirt': None, 'pants': None, 'shoes': None}
-        outfit[item_type] = item_id
-
-        # Randomly pick the other items
-        for other_type in ['shirt', 'pants', 'shoes']:
-            if other_type != item_type:
-                outfit[other_type] = random.choice(self.wardrobe_items[other_type])
-
-        return {
-            'shirt': outfit['shirt'],
-            'pants': outfit['pants'],
-            'shoes': outfit['shoes'],
-            'score': 0.5,
-            'score_source': 'exploration_with_fixed',
-            'fixed_item': f"{item_id}"
-        }
-
-    def get_ml_outfit_completion(self, item_type, item_id, use_existing_ratings=False):
-        """ML-based outfit completion (original logic)"""
-        if self.scored_combinations is None:
-            self.score_all_combinations_cached(use_existing_ratings=use_existing_ratings)
-
-        if len(self.scored_combinations) == 0:
-            return None
-
-        # filter combinations that include the specified item
-        item_column = f"{item_type}_id"
-        if item_column not in self.scored_combinations.columns:
-            raise ValueError(f"invalid item type: {item_type}. must be 'shirt', 'pants', or 'shoes'")
-
-        threshold_prob = getattr(self.model, 'threshold', self.score_threshold) if self.model else self.score_threshold
-
-        matching_outfits = self.scored_combinations[
-            (self.scored_combinations[item_column] == item_id) &
-            (self.scored_combinations['recommendation_score'] >= threshold_prob)
-        ]
-
-        if len(matching_outfits) == 0:
-            print(f"no high-scoring outfits found including {item_id}")
-            # try with all combinations including this item
-            all_matching = self.scored_combinations[
-                self.scored_combinations[item_column] == item_id
-            ]
-            if len(all_matching) > 0:
-                best_outfit = all_matching.nlargest(1, 'recommendation_score').iloc[0]
-                print(f"returning best available option with score {best_outfit['recommendation_score']:.2f}")
-            else:
-                return None
-        else:
-            # return random outfit from high-scoring matches
-            best_outfit = matching_outfits.sample(n=1).iloc[0]
-
-        return {
-            'shirt': best_outfit['shirt_id'],
-            'pants': best_outfit['pants_id'],
-            'shoes': best_outfit['shoes_id'],
-            'score': best_outfit['recommendation_score'],
-            'score_source': best_outfit['score_source'],
-            'fixed_item': f"{item_id}"
-        }
 
 
 # keep backward compatibility

@@ -1,6 +1,7 @@
 """
 database-enabled feature engineering pipeline for outfit recommendation
-creates ml-ready features from wardrobe items and color palettes
+takes raw wardrobe data and turns it into features the ml model can actually use
+handles colour matching, style compatibility, and all the fancy polynomial stuff
 """
 
 import pandas as pd
@@ -22,7 +23,7 @@ class OutfitFeatureEngine:
     """database-enabled feature engineering for outfit combinations"""
     
     def __init__(self, user_id, db):
-        """initialize with user id and database connection"""
+        """initialise with user id and database connection"""
         self.user_id = user_id
         self.db = db
         self.poly_transformer = None
@@ -78,7 +79,7 @@ class OutfitFeatureEngine:
                     how="left"
                 ).drop(columns=[f"{item_type}_clothing_id"])
         
-        # ensure color columns stay as strings to prevent pandas conversion errors
+        # ensure colour columns stay as strings to prevent pandas conversion errors
         color_cols = [
             'shirt_dominant_color', 'shirt_secondary_color',
             'pants_dominant_color', 'pants_secondary_color', 
@@ -109,7 +110,7 @@ class OutfitFeatureEngine:
         return df
     
     def hex_to_lab(self, hex_code):
-        """convert hex color to lab color space"""
+        """convert hex colour to lab colour space"""
         if pd.isna(hex_code) or not hex_code or hex_code == 'nan':
             return None
         try:
@@ -119,10 +120,10 @@ class OutfitFeatureEngine:
             return None
     
     def create_color_harmony_features(self, df):
-        """calculate color harmony metrics using dominant colors from database"""
+        """calculate colour harmony metrics using dominant colours from database"""
         
         def calculate_color_distance(row):
-            """measure color similarity between shirt, pants, shoes"""
+            """measure colour similarity between shirt, pants, shoes"""
             colors = []
             
             for item in ['shirt', 'pants', 'shoes']:
@@ -155,10 +156,10 @@ class OutfitFeatureEngine:
         return df
     
     def create_lab_color_features(self, df):
-        """extract lab color values for dominant colors from database"""
+        """extract lab colour values for dominant colours from database"""
         
         def extract_lab_values(hex_color):
-            """get l*a*b* values for hex color"""
+            """get l*a*b* values for hex colour"""
             try:
                 lab_color = self.hex_to_lab(hex_color)
                 if lab_color:
@@ -195,9 +196,9 @@ class OutfitFeatureEngine:
         return df
     
     def create_palette_features(self, df):
-        """find closest color palette for each outfit using database colors"""
+        """find closest colour palette for each outfit using database colours"""
         
-        # get color palettes from database
+        # get colour palettes from database
         palettes = self.db.get_color_palettes()
         
         if not palettes:
@@ -219,7 +220,7 @@ class OutfitFeatureEngine:
             best_palette, best_distance = None, float('inf')
             
             for palette in palettes:
-                # extract palette colors (skip none values)
+                # extract palette colours (skip none values)
                 palette_colors = []
                 for i in range(1, 6):
                     color = palette.get(f'color_{i}')
@@ -229,7 +230,7 @@ class OutfitFeatureEngine:
                 if not palette_colors:
                     continue
                 
-                # calculate average distance from outfit colors to palette
+                # calculate average distance from outfit colours to palette
                 distances = []
                 for outfit_color in outfit_colors:
                     outfit_lab = self.hex_to_lab(outfit_color)
@@ -264,7 +265,7 @@ class OutfitFeatureEngine:
         return df
     
     def create_polynomial_features(self, X_train, X_test=None, degree=3, fit=True):
-        """create polynomial interaction features"""
+        """create polynomial interaction features - lets the model learn non-linear relationships"""
 
         # identify numeric columns
         numeric_cols = X_train.select_dtypes(include=['int64', 'float64']).columns
@@ -285,7 +286,7 @@ class OutfitFeatureEngine:
             flag_cols = [c for c in X_train.columns if c not in numeric_cols]
             X_train_final = pd.concat([X_train[flag_cols], X_train_poly], axis=1)
 
-            # ONLY set feature_names when fitting
+            # only set feature_names when fitting
             self.feature_names = X_train_final.columns.tolist()
 
         else:
@@ -314,37 +315,37 @@ class OutfitFeatureEngine:
         return X_train_final
     
     def align_prediction_columns(self, X_pred, expected_columns):
-        """Ensure prediction features match training features exactly"""
+        """ensure prediction features match training features exactly"""
         
-        # Get current columns
+        # get current columns
         current_columns = set(X_pred.columns)
         expected_columns_set = set(expected_columns)
         
-        # Add missing columns with zeros
+        # add missing columns with zeros
         missing_columns = expected_columns_set - current_columns
         for col in missing_columns:
             X_pred[col] = 0.0
         
-        # Remove extra columns
+        # remove extra columns
         extra_columns = current_columns - expected_columns_set
         if extra_columns:
             X_pred = X_pred.drop(columns=list(extra_columns))
         
-        # Reorder columns to match training order
+        # reorder columns to match training order
         X_pred = X_pred[expected_columns]
         
-        print(f"Aligned features: {len(X_pred.columns)} columns (added {len(missing_columns)}, removed {len(extra_columns)})")
+        print(f"aligned features: {len(X_pred.columns)} columns (added {len(missing_columns)}, removed {len(extra_columns)})")
         
         return X_pred
     
     def prepare_outfit_features(self, df, for_training=True):
         """full feature engineering pipeline with robust column handling"""
 
-        # Add outfit hashes for caching
+        # add outfit hashes for caching
         if 'outfit_hash' not in df.columns:
             df['outfit_hash'] = (df['shirt_id'] + '_' + df['pants_id'] + '_' + df['shoes_id'])
 
-        # Check for cached features (only for prediction, not training)
+        # check for cached features (only for prediction, not training)
         cached_features = {}
         missing_hashes = df['outfit_hash'].tolist()
 
@@ -359,43 +360,43 @@ class OutfitFeatureEngine:
             if cached_features:
                 None
             if missing_hashes:
-                print(f"Need to compute features for {len(missing_hashes)} combinations")
+                print(f"need to compute features for {len(missing_hashes)} combinations")
 
-        # Compute features for missing combinations
+        # compute features for missing combinations
         if missing_hashes:
             if not for_training:
-                print("Computing missing features...")
+                print("computing missing features...")
 
-            # Filter to outfits that need computation
+            # filter to outfits that need computation
             missing_df = df[df['outfit_hash'].isin(missing_hashes)].copy()
 
-            # STEP 1: get clothing features from database
+            # step 1: get clothing features from database
             missing_df = self.get_clothing_features_from_db(missing_df)
 
-            # STEP 2: categorical features
+            # step 2: categorical features
             missing_df = self.create_categorical_features(missing_df)
 
-            # STEP 3: color harmony features
+            # step 3: colour harmony features
             missing_df = self.create_color_harmony_features(missing_df)
 
-            # STEP 4: lab color features
+            # step 4: lab colour features
             missing_df = self.create_lab_color_features(missing_df)
 
-            # STEP 5: style compatibility features
+            # step 5: style compatibility features
             missing_df = self.create_style_compatibility_features(missing_df)
 
-            # STEP 6: palette features
+            # step 6: palette features
             missing_df = self.create_palette_features(missing_df)
 
-            # STEP 7: prepare for ml
+            # step 7: prepare for ml
             drop_cols = [
                 "shirt_id", "pants_id", "shoes_id", "rating", "outfit_hash",
                 "closest_palette", "rating_binary",
-                # Color hex columns
+                # colour hex columns
                 "shirt_dominant_color", "shirt_secondary_color",
                 "pants_dominant_color", "pants_secondary_color", 
                 "shoes_dominant_color", "shoes_secondary_color",
-                # Text description columns
+                # text description columns
                 "shirt_color_description", "pants_color_description", "shoes_color_description"
             ]       
 
@@ -403,59 +404,59 @@ class OutfitFeatureEngine:
             drop_cols = [col for col in drop_cols if col in missing_df.columns]
             X_missing = missing_df.drop(columns=drop_cols)
 
-            # STEP 8: handle any remaining NaN values before polynomial features
+            # step 8: handle any remaining NaN values before polynomial features
             X_missing = X_missing.fillna(0.0)
 
-            # STEP 9: polynomial features with column alignment
+            # step 9: polynomial features with column alignment
             if for_training:
                 X_missing_final = self.create_polynomial_features(X_missing, fit=True)
             else:
                 X_missing_final = self.create_polynomial_features(X_missing, fit=False)
 
-                # CRITICAL: Align columns with training features
+                # critical: align columns with training features
                 if hasattr(self, 'feature_names') and self.feature_names:
                     X_missing_final = self.align_prediction_columns(X_missing_final, self.feature_names)
 
-            # Cache the computed features (only for prediction)
+            # cache the computed features (only for prediction)
             if not for_training:
-                print("Caching computed features...")
+                print("caching computed features...")
                 for idx, outfit_hash in enumerate(missing_hashes):
                     features = X_missing_final.iloc[idx].values
                     self.db.save_outfit_features(self.user_id, outfit_hash, features)
                     cached_features[outfit_hash] = features
             else:
-                # For training, just add to our working set
+                # for training, just add to our working set
                 for idx, outfit_hash in enumerate(missing_hashes):
                     cached_features[outfit_hash] = X_missing_final.iloc[idx].values
 
-        # Reconstruct full feature matrix from cached + computed features
+        # reconstruct full feature matrix from cached + computed features
         if not for_training and len(cached_features) < len(df):
-            print("Warning: Some features still missing after computation")
+            print("warning: some features still missing after computation")
 
-        # Build final feature matrix in original order
+        # build final feature matrix in original order
         feature_matrix = []
         for outfit_hash in df['outfit_hash']:
             if outfit_hash in cached_features:
                 feature_matrix.append(cached_features[outfit_hash])
             else:
-                # This shouldn't happen, but provide fallback
-                print(f"Warning: No features found for {outfit_hash}")
-                # Create zero vector as fallback
+                # this shouldn't happen, but provide fallback
+                print(f"warning: no features found for {outfit_hash}")
+                # create zero vector as fallback
                 if hasattr(self, 'feature_names') and self.feature_names:
                     feature_matrix.append(np.zeros(len(self.feature_names)))
                 else:
                     feature_matrix.append(np.zeros(100))  # fallback size
 
-        # Convert to DataFrame with proper column handling
+        # convert to dataframe with proper column handling
         if hasattr(self, 'feature_names') and self.feature_names:
-            # We have a saved transformer - need to align all features to it
+            # we have a saved transformer - need to align all features to it
             feature_names = self.feature_names
             
-            # Check if feature dimensions match
+            # check if feature dimensions match
             if len(feature_matrix[0]) != len(feature_names):
-                print(f"Feature dimension mismatch detected: computed={len(feature_matrix[0])}, expected={len(feature_names)}")
+                print(f"feature dimension mismatch detected: computed={len(feature_matrix[0])}, expected={len(feature_names)}")
                 
-                # Create temporary DataFrame to align
+                # create temporary dataframe to align
                 if missing_hashes and 'X_missing_final' in locals():
                     temp_feature_names = X_missing_final.columns.tolist()
                 else:
@@ -463,19 +464,19 @@ class OutfitFeatureEngine:
                 
                 temp_df = pd.DataFrame(feature_matrix, columns=temp_feature_names, index=df.index)
                 
-                # Align to expected features
+                # align to expected features
                 temp_df = self.align_prediction_columns(temp_df, feature_names)
                 X_final = temp_df
             else:
                 X_final = pd.DataFrame(feature_matrix, columns=feature_names, index=df.index)
                 
         elif missing_hashes and 'X_missing_final' in locals():
-            # First time computing - use computed feature names
+            # first time computing - use computed feature names
             feature_names = X_missing_final.columns.tolist()
             self.feature_names = feature_names
             X_final = pd.DataFrame(feature_matrix, columns=feature_names, index=df.index)
         else:
-            # Fallback
+            # fallback
             feature_names = [f"feat_{i}" for i in range(len(feature_matrix[0]))]
             self.feature_names = feature_names
             X_final = pd.DataFrame(feature_matrix, columns=feature_names, index=df.index)
@@ -496,7 +497,7 @@ class OutfitFeatureEngine:
        with open(filepath, 'wb') as f:
            pickle.dump(transformer_data, f)
        
-       print(f"Saved transformer with {len(self.feature_names)} features")
+       print(f"saved transformer with {len(self.feature_names)} features")
 
     def load_transformer(self, filepath):
        """load saved feature transformer"""
@@ -507,7 +508,7 @@ class OutfitFeatureEngine:
        self.poly_transformer = transformer_data['poly_transformer']
        self.feature_names = transformer_data['feature_names']
        
-       print(f"Loaded transformer with {len(self.feature_names)} features")
+       print(f"loaded transformer with {len(self.feature_names)} features")
 
 
 # convenience functions for easy import
@@ -525,54 +526,55 @@ def create_training_features(user_id, outfit_df, db, save_transformer=True):
 
 
 def create_prediction_features(user_id, outfit_df, db, use_saved_transformer=True):
-    """create features for prediction using ONLY cached features"""
+    """create features for prediction using only cached features"""
     
-    # Add outfit hashes
+    # add outfit hashes
     if 'outfit_hash' not in outfit_df.columns:
-        outfit_df = outfit_df.copy()  # Don't modify original
+        outfit_df = outfit_df.copy()  # don't modify original
         outfit_df['outfit_hash'] = (outfit_df['shirt_id'] + '_' + outfit_df['pants_id'] + '_' + outfit_df['shoes_id'])
         
-    # Get cached features
+    # get cached features
     cached_data = db.get_outfit_features(user_id, outfit_df['outfit_hash'].tolist())
     
     if len(cached_data) == 0:
-        raise ValueError("No cached features found! Run precompute_all_outfit_features() first.")
+        raise ValueError("no cached features found! run precompute_all_outfit_features() first.")
     
     if len(cached_data) != len(outfit_df):
-        print(f"WARNING: Only {len(cached_data)}/{len(outfit_df)} features cached")
-        # Show which ones are missing
+        print(f"warning: only {len(cached_data)}/{len(outfit_df)} features cached")
+        # show which ones are missing
         cached_hashes = {item['outfit_hash'] for item in cached_data}
         missing_hashes = [h for h in outfit_df['outfit_hash'] if h not in cached_hashes]
-        print(f"Missing combinations: {missing_hashes[:5]}...")
-        raise ValueError("Some outfit combinations not cached! Run precompute_all_outfit_features() again.")
+        print(f"missing combinations: {missing_hashes[:5]}...")
+        raise ValueError("some outfit combinations not cached! run precompute_all_outfit_features() again.")
         
-    # Build feature matrix from cached data
+    # build feature matrix from cached data
     cached_dict = {item['outfit_hash']: pickle.loads(item['feature_blob']) for item in cached_data}
     
-    # Reconstruct features in original order
+    # reconstruct features in original order
     feature_matrix = []
     for outfit_hash in outfit_df['outfit_hash']:
         if outfit_hash in cached_dict:
             feature_matrix.append(cached_dict[outfit_hash])
         else:
-            raise ValueError(f"Missing cached features for {outfit_hash}")
+            raise ValueError(f"missing cached features for {outfit_hash}")
     
-    # Get feature names from transformer
+    # get feature names from transformer
     transformer_path = f"models/user_{user_id}/feature_transformer.pkl"
     if Path(transformer_path).exists():
         with open(transformer_path, 'rb') as f:
             transformer_data = pickle.load(f)
             feature_names = transformer_data.get('feature_names')
     else:
-        raise FileNotFoundError(f"No transformer found at {transformer_path}")
+        raise FileNotFoundError(f"no transformer found at {transformer_path}")
     
     if not feature_names:
-        raise ValueError("Transformer missing feature names")
+        raise ValueError("transformer missing feature names")
     
-    # Create DataFrame with correct feature names
+    # create dataframe with correct feature names
     if len(feature_matrix[0]) != len(feature_names):
-        raise ValueError(f"Feature dimension mismatch: cached={len(feature_matrix[0])}, expected={len(feature_names)}")
+        raise ValueError(f"feature dimension mismatch: cached={len(feature_matrix[0])}, expected={len(feature_names)}")
     
     X = pd.DataFrame(feature_matrix, columns=feature_names, index=outfit_df.index)
     
     return X
+

@@ -1,6 +1,7 @@
 """
 extracts semantic clothing features using anthropic's claude (multimodal)
-analyzes style, formality, and pattern information for wardrobe items
+analyses style, formality, and pattern information for wardrobe items
+basically gets claude to look at your clothes and tell you what vibe they are
 """
 
 import os
@@ -30,7 +31,7 @@ def extract_genai_features(image_path: str) -> dict:
     base64_img = encode_image(image_path)
 
     prompt = """
-    analyze this clothing image and classify the following fields in strict json:
+    analyse this clothing image and classify the following fields in strict json:
     - pattern_type: one of [striped, checkered, plain, floral, graphic_pattern, other]
     - has_graphic: boolean (true if logos, text, or large graphic designs visible)
     - style: one of [casual, business, streetwear, vintage, formal, athletic]
@@ -38,7 +39,7 @@ def extract_genai_features(image_path: str) -> dict:
     - formality_score: float 0-1 (0=very casual, 1=very formal)
     - versatility_score: float 0-1 (0=specific occasion only, 1=works anywhere)
     - season_suitability: one of [spring, summer, fall, winter, all_season]
-    - color_description: brief description of main colors
+    - color_description: brief description of main colours
 
     respond only with compact json. no explanations.
     """
@@ -109,7 +110,7 @@ def process_wardrobe_genai(input_dir: str, user_id: int, db):
     input_path = Path(input_dir)
     image_files = list(input_path.glob("*_processed.png"))
 
-    print(f"found {len(image_files)} processed images to analyze")
+    print(f"found {len(image_files)} processed images to analyse")
 
     # get existing genai features to avoid reprocessing
     existing_genai = db.get_genai_features(user_id)

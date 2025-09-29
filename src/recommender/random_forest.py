@@ -1,6 +1,7 @@
 """
-User-aware random forest model for outfit recommendation system
-Each user gets their own personalized model based on their ratings
+user-aware random forest model for outfit recommendation system
+each user gets their own personalised model based on their ratings
+learns what you like and gets better over time
 """
 
 import pandas as pd
@@ -13,10 +14,10 @@ from sklearn.model_selection import train_test_split
 from src.feature_extraction.feature_engineering import create_training_features
 
 class UserOutfitRecommendationModel:
-    """User-specific random forest classifier for predicting outfit ratings"""
+    """user-specific random forest classifier for predicting outfit ratings"""
     
     def __init__(self, user_id, n_estimators=500, max_depth=5, class_weight={0: 1, 1: 2}, random_state=42):
-        """initialize with user ID and optimized hyperparameters"""
+        """initialise with user id and optimised hyperparameters"""
         self.user_id = user_id
         self.model = RandomForestClassifier(
             n_estimators=n_estimators,
@@ -100,31 +101,31 @@ class UserOutfitRecommendationModel:
             print()
             print("test set confusion matrix:")
 
-            # Handle confusion matrix more robustly
+            # handle confusion matrix more robustly
             cm = confusion_matrix(y_test, y_test_pred)
             unique_labels = sorted(list(set(y_test) | set(y_test_pred)))
 
             if len(unique_labels) == 1:
-                # Only one class present
+                # only one class present
                 label = unique_labels[0]
                 print(f"predicted:  {label}")
                 print(f"actual {label}: [{cm[0,0]:3d}]")
-                print("(Note: Only one class present in test set)")
+                print("(note: only one class present in test set)")
             elif len(unique_labels) == 2:
-                # Both classes present - normal case
+                # both classes present - normal case
                 print("predicted:  0   1")
                 if cm.shape == (2, 2):
                     print(f"actual 0: [{cm[0,0]:3d} {cm[0,1]:3d}]")
                     print(f"actual 1: [{cm[1,0]:3d} {cm[1,1]:3d}]")
                 elif cm.shape == (1, 1):
-                    # Edge case: only one class in actual data
+                    # edge case: only one class in actual data
                     actual_class = unique_labels[0] if len(set(y_test)) == 1 else 0
                     print(f"actual {actual_class}: [{cm[0,0]:3d}]")
                 else:
-                    print(f"Confusion matrix shape: {cm.shape}")
+                    print(f"confusion matrix shape: {cm.shape}")
                     print(cm)
             else:
-                # More than 2 classes (shouldn't happen with binary classification)
+                # more than 2 classes (shouldn't happen with binary classification)
                 print("predicted:", "  ".join(map(str, unique_labels)))
                 for i, actual_label in enumerate(unique_labels):
                     row = "  ".join(f"{cm[i,j]:3d}" if j < cm.shape[1] else "  0" for j in range(len(unique_labels)))
@@ -133,10 +134,10 @@ class UserOutfitRecommendationModel:
         return results
     
     def get_feature_importance(self, top_n=10):
-        """analyze which features are most important for this user's outfit preferences"""
+        """analyse which features are most important for this user's outfit preferences"""
         
         if not self.is_fitted:
-            raise ValueError(f"model for user {self.user_id} must be trained before analyzing features")
+            raise ValueError(f"model for user {self.user_id} must be trained before analysing features")
         
         if self.feature_names is None:
             print("feature names not available")
@@ -216,7 +217,7 @@ def train_user_model_from_data(user_id, X, y, version=None, test_size=0.2):
     # split into train/test
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
     
-    # initialize and train user model
+    # initialise and train user model
     model = UserOutfitRecommendationModel(user_id)
     model.train(X_train, y_train, version=version)
     
@@ -224,7 +225,7 @@ def train_user_model_from_data(user_id, X, y, version=None, test_size=0.2):
     results = model.evaluate(X_train, y_train, X_test, y_test)
     print()
     
-    # analyze feature importance
+    # analyse feature importance
     model.get_feature_importance(top_n=15)
     print()
     
@@ -244,7 +245,7 @@ def train_user_model_from_ratings(user_id, db, min_ratings=5, version=None):
         print(f"user {user_id}: not enough ratings for training (need at least {min_ratings}, have {len(ratings)})")
         return None
     
-    # Generate version if not provided
+    # generate version if not provided
     if version is None:
         from datetime import datetime
         version = f"v{len(ratings)}_{datetime.now().strftime('%Y%m%d_%H%M')}"
@@ -263,12 +264,12 @@ def train_user_model_from_ratings(user_id, db, min_ratings=5, version=None):
     df = pd.DataFrame(training_data)
     df['rating_binary'] = (df['rating'] >= 4).astype(int)
     
-    # CRITICAL FIX: Load existing transformer if cached features exist
+    # load existing transformer if cached features exist
     transformer_path = f"models/user_{user_id}/feature_transformer.pkl"
     stats = db.get_database_stats(user_id)
     
-    # Always create fresh transformer for training to match rated outfits
-    print("Creating transformer from training data")
+    # always create fresh transformer for training to match rated outfits
+    print("creating transformer from training data")
     X, engine = create_training_features(user_id, df, db, save_transformer=False)
     
     y = df['rating_binary']
@@ -285,7 +286,7 @@ def train_user_model_from_ratings(user_id, db, min_ratings=5, version=None):
         model_path=model.get_model_path(version)
     )
     
-    print(f"Model registered in database: {version}")
+    print(f"model registered in database: {version}")
     
     return model, results
 

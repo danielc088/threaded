@@ -28,6 +28,7 @@ web-build/
 .env.local
 .env.*.local
 
+.venv/
 .vscode/
 .idea/
 *.swp
@@ -46,5 +47,9 @@ static/images/
 *.zip
 *.tar.gz
 
-data/database/
+data/database/threaded.db
 models/
+
+node_modules/
+package-lock.json
+yarn.lock

@@ -1,4 +1,5 @@
 """
+[ARCHIVED]
 display outfit combinations with images
 shows clothing items side by side for visual review
 main menu system for wardrobe management and outfit generation
@@ -741,7 +742,7 @@ def main_menu(db, user_id):
         elif choice == "4":
             outfit_with_chosen_item(db, user_id)
         elif choice == "5":
-            print("\n👋 thank you for using threaded!")
+            print("\nthank you for using threaded!")
             break
         else:
-            print("❌ please enter a number from 1-5")
+            print("please enter a number from 1-5")

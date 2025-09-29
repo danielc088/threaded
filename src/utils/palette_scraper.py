@@ -1,6 +1,7 @@
 """
-color palette scraper for getting trendy color palettes from coolors.co
-this gives us a database of popular color combos to match against
+colour palette scraper for getting trendy colour palettes from coolors.co
+this gives us a database of popular colour combos to match against
+helps us understand what colours actually look good together
 """
 
 import time, re, sys, os, json
@@ -32,7 +33,7 @@ def get_driver():
 
 
 def scrape_trending_palettes(max_palettes=50):
-    """get the trending color palettes from coolors.co"""
+    """get the trending colour palettes from coolors.co"""
     driver = get_driver()
     
     try:
@@ -56,7 +57,7 @@ def scrape_trending_palettes(max_palettes=50):
             const nameEl = card.querySelector('.palette-card_name');
             const name = nameEl ? nameEl.textContent.trim() : `palette ${index+1}`;
             
-            // grab all the hex colors
+            // grab all the hex colours
             const colorDivs = card.querySelectorAll('.palette-card_colors div');
             const colors = [];
             
@@ -82,7 +83,7 @@ def scrape_trending_palettes(max_palettes=50):
         
         # only keep the ones we asked for
         limited_palettes = dict(list(palette_data.items())[:max_palettes])
-        print(f"scraped {len(limited_palettes)} color palettes")
+        print(f"scraped {len(limited_palettes)} colour palettes")
         
         return limited_palettes
         
@@ -117,7 +118,7 @@ def update_palette_database(db, max_palettes=50):
 
 
 if __name__ == "__main__":
-    # for testing - would need to import database
-    from database.models import WardrobeDB
+    # for testing
+    from data.database.models import WardrobeDB
     db = WardrobeDB()
     update_palette_database(db, max_palettes=100)

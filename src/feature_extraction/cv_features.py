@@ -1,6 +1,6 @@
 """
 computer vision feature extraction for clothing images
-extracts color, texture, and pattern data for the recommendation system
+pulls out colour, texture, and pattern data so we can recommend outfits that actually work together
 """
 
 import pandas as pd
@@ -18,7 +18,7 @@ def rgb_to_hex(rgb):
 
 
 def extract_dominant_colors(img, n_clusters=10, top_n=5):
-    """get the top dominant colors from clothing item using k-means"""
+    """get the top dominant colours from clothing item using k-means clustering"""
     
     # reshape image to get all pixels with rgba values
     color_tbl = pd.DataFrame(
@@ -34,7 +34,7 @@ def extract_dominant_colors(img, n_clusters=10, top_n=5):
         # not enough pixels for clustering
         return []
     
-    # run k-means clustering to find dominant colors
+    # run k-means clustering to find dominant colours
     km = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
     km.fit(color_tbl)
     
@@ -47,7 +47,7 @@ def extract_dominant_colors(img, n_clusters=10, top_n=5):
     sorted_centers = km.cluster_centers_[sorted_indices]
     sorted_counts = counts[sorted_indices]
     
-    # take top n colors and calculate their weights
+    # take top n colours and calculate their weights
     top_centers = sorted_centers[:top_n]
     top_counts = sorted_counts[:top_n]
     total_top = sum(top_counts)
@@ -71,11 +71,11 @@ def calculate_texture_variance(img):
     if not mask.any():
         return 0  # no clothing pixels found
     
-    # create a masked grayscale image for texture analysis
+    # create a masked greyscale image for texture analysis
     height, width = img.shape[:2]
     gray_img = np.zeros((height, width), dtype=np.uint8)
     
-    # fill in the clothing areas with grayscale values
+    # fill in the clothing areas with greyscale values
     rgb_255 = (img[:, :, :3] * 255).astype(np.uint8)
     gray_full = cv2.cvtColor(rgb_255, cv2.COLOR_RGB2GRAY)
     gray_img[mask] = gray_full[mask]
@@ -100,13 +100,13 @@ def calculate_brightness_level(img):
 
 
 def calculate_color_statistics(img):
-    """calculate color statistics (saturation, hue, variance)"""
+    """calculate colour statistics (saturation, hue, variance)"""
     mask = img[:, :, 3] > 0.95
     
     if not mask.any():
         return 0.0, 0.0, 0.0
     
-    # convert to hsv for better color analysis
+    # convert to hsv for better colour analysis
     rgb_255 = (img[:, :, :3] * 255).astype(np.uint8)
     hsv = cv2.cvtColor(rgb_255, cv2.COLOR_RGB2HSV)
     
@@ -114,8 +114,8 @@ def calculate_color_statistics(img):
     clothing_hsv = hsv[mask]
     
     # calculate statistics
-    avg_saturation = float(np.mean(clothing_hsv[:, 1]) / 255.0)  # normalize to 0-1
-    avg_hue = float(np.mean(clothing_hsv[:, 0]) / 179.0)  # normalize to 0-1
+    avg_saturation = float(np.mean(clothing_hsv[:, 1]) / 255.0)  # normalise to 0-1
+    avg_hue = float(np.mean(clothing_hsv[:, 0]) / 179.0)  # normalise to 0-1
     color_variance = float(np.var(clothing_hsv, axis=0).mean())
     
     return avg_saturation, avg_hue, color_variance
@@ -128,7 +128,7 @@ def calculate_edge_density(img):
     if not mask.any():
         return 0.0
     
-    # convert to grayscale
+    # convert to greyscale
     rgb_255 = (img[:, :, :3] * 255).astype(np.uint8)
     gray = cv2.cvtColor(rgb_255, cv2.COLOR_RGB2GRAY)
     
@@ -147,10 +147,10 @@ def extract_all_features(image_path):
     
     img = plt.imread(str(image_path))
     
-    # extract dominant colors
+    # extract dominant colours
     dominant_colors = extract_dominant_colors(img)
     
-    # get primary and secondary colors
+    # get primary and secondary colours
     dominant_color = dominant_colors[0][0] if dominant_colors else None
     secondary_color = dominant_colors[1][0] if len(dominant_colors) > 1 else None
     
@@ -180,7 +180,7 @@ def process_wardrobe_features(input_dir, user_id, db):
     input_path = Path(input_dir)
     image_files = list(input_path.glob("*_processed.png"))
 
-    print(f"found {len(image_files)} processed images to analyze")
+    print(f"found {len(image_files)} processed images to analyse")
 
     processed_count = 0
     

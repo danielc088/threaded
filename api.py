@@ -1,6 +1,7 @@
 """
-api.py - REST API wrapper for existing threaded functionality
-exposes all your existing code as API endpoints for React Native
+api.py - rest api wrapper for existing threaded functionality
+exposes all the existing code as api endpoints for react native
+basically just wraps everything so the mobile app can talk to it
 """
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -13,10 +14,10 @@ import shutil
 import json
 import traceback
 
-# add project root to path (same as before)
+# add project root to path
 sys.path.append(str(Path(__file__).parent))
 
-# import all your existing code (zero changes needed!)
+# import all existing code (zero changes needed)
 from data.database.schema import create_database
 from data.database.models import WardrobeDB
 from src.recommender.outfit_generator import CachedOutfitGenerator
@@ -26,7 +27,7 @@ from src.feature_extraction.genai_features import extract_genai_features
 
 app = FastAPI(title="Threaded API", version="1.0.0")
 
-# enable CORS for React Native
+# enable cors for react native
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # configure for production
@@ -35,12 +36,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# setup database (same as your main.py)
+# setup database
 db_path = create_database("data/database/threaded.db")
 db = WardrobeDB(db_path)
 user_id = 1
 
-# create directories (same as before)
+# create directories
 user_dirs = [
     f"data/wardrobe/{user_id}/raw_images",
     f"data/wardrobe/{user_id}/bg_removed", 
@@ -52,36 +53,36 @@ for dir_path in user_dirs:
 
 Path("models").mkdir(exist_ok=True)
 
-# STARTUP - Only train model if needed, don't pre-compute features
-print("\n=== STARTUP: Checking system ===")
+# startup - only train model if needed, don't pre-compute features
+print("\n=== startup: checking system ===")
 try:
     model_path = Path(f"models/user_{user_id}/outfit_recommender_latest.pkl")
     ratings = db.get_all_ratings(user_id)
     
     if not model_path.exists() and len(ratings) >= 5:
-        print(f"No model found but {len(ratings)} ratings available - training initial model...")
+        print(f"no model found but {len(ratings)} ratings available - training initial model...")
         from src.recommender.random_forest import train_user_model_from_ratings
         train_user_model_from_ratings(user_id, db, min_ratings=5)
-        print("✓ Initial model trained successfully")
+        print("initial model trained successfully")
     elif model_path.exists():
-        print(f"✓ Model exists")
+        print(f"model exists")
     else:
-        print("No trained model yet - rate 5 outfits to train your first model!")
+        print("no trained model yet - rate 5 outfits to train first model")
     
-    # Check if transformer exists
+    # check if transformer exists
     transformer_path = Path(f"models/user_{user_id}/feature_transformer.pkl")
     if transformer_path.exists():
-        print(f"✓ Feature transformer exists")
+        print(f"feature transformer exists")
     else:
-        print("⚠ No feature transformer - will be created on first outfit request")
+        print("no feature transformer - will be created on first outfit request")
         
 except Exception as e:
-    print(f"✗ Startup check failed: {e}")
+    print(f"startup check failed: {e}")
     import traceback
     traceback.print_exc()
-print("=== STARTUP COMPLETE ===\n")
+print("=== startup complete ===\n")
 
-# pydantic models for API
+# pydantic models for api
 class OutfitRating(BaseModel):
     shirt_id: str
     pants_id: str
@@ -93,21 +94,21 @@ class OutfitRequest(BaseModel):
     item_type: str
     item_id: str
 
-# === API ENDPOINTS ===
+# === api endpoints ===
 
 @app.get("/")
 def root():
-    return {"message": "Threaded API is running"}
+    return {"message": "threaded api is running"}
 
 @app.get("/wardrobe/stats")
 def get_wardrobe_stats():
-    """get wardrobe statistics - uses your existing db.get_database_stats()"""
+    """get wardrobe statistics"""
     stats = db.get_database_stats(user_id)
     return stats
 
 @app.get("/wardrobe/items")
 def get_wardrobe_items(item_type: Optional[str] = None):
-    """get wardrobe items - uses your existing db.get_wardrobe_items()"""
+    """get wardrobe items with natural sorting"""
     items = db.get_wardrobe_items(user_id, item_type)
     
     # add natural sorting
@@ -123,13 +124,13 @@ async def add_wardrobe_item(
     item_type: str,
     file: UploadFile = File(...)
 ):
-    """add new wardrobe item - uses all your existing processing code"""
+    """add new wardrobe item - runs through full processing pipeline"""
     
-    print(f"\n=== UPLOAD DEBUG ===")
-    print(f"Received: filename={file.filename}, content_type={file.content_type}, item_type={item_type}")
+    print(f"\n=== upload debug ===")
+    print(f"received: filename={file.filename}, content_type={file.content_type}, item_type={item_type}")
     
     try:
-        # generate clothing id (same logic as your add_new_item function)
+        # generate clothing id
         existing_items = db.get_wardrobe_items(user_id, item_type)
         existing_ids = [item['clothing_id'] for item in existing_items]
         
@@ -138,7 +139,7 @@ async def add_wardrobe_item(
             next_num += 1
         
         clothing_id = f"{item_type}_{next_num}"
-        print(f"Generated clothing_id: {clothing_id}")
+        print(f"generated clothing_id: {clothing_id}")
         
         # save uploaded file
         raw_dir = Path(f"data/wardrobe/{user_id}/raw_images")
@@ -147,73 +148,73 @@ async def add_wardrobe_item(
             file_ext = '.jpg'
         raw_file = raw_dir / f"{clothing_id}{file_ext}"
         
-        print(f"Saving to: {raw_file}")
+        print(f"saving to: {raw_file}")
         
         with open(raw_file, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        print(f"File saved - exists: {raw_file.exists()}, size: {raw_file.stat().st_size if raw_file.exists() else 'N/A'} bytes")
+        print(f"file saved - exists: {raw_file.exists()}, size: {raw_file.stat().st_size if raw_file.exists() else 'N/A'} bytes")
         
-        # process image (uses your existing preprocessing)
+        # process image
         bg_dir = Path(f"data/wardrobe/{user_id}/bg_removed")
         processed_dir = Path(f"data/wardrobe/{user_id}/processed_images")
         
         bg_removed_file = bg_dir / f"{clothing_id}_bg_removed.png"
         processed_file = processed_dir / f"{clothing_id}_processed.png"
         
-        print(f"Starting image preprocessing...")
-        print(f"  Input: {raw_file}")
-        print(f"  BG removed output: {bg_removed_file}")
-        print(f"  Processed output: {processed_file}")
+        print(f"starting image preprocessing...")
+        print(f"  input: {raw_file}")
+        print(f"  bg removed output: {bg_removed_file}")
+        print(f"  processed output: {processed_file}")
         
-        # call your existing preprocessing function
+        # call preprocessing function
         bg_removed_img, processed_img = preprocess_clothing_image_stages(
             raw_file, bg_removed_file, processed_file
         )
         
-        print(f"Preprocessing complete!")
-        print(f"  BG removed exists: {bg_removed_file.exists()}")
-        print(f"  Processed exists: {processed_file.exists()}")
+        print(f"preprocessing complete")
+        print(f"  bg removed exists: {bg_removed_file.exists()}")
+        print(f"  processed exists: {processed_file.exists()}")
         
-        # extract features (uses your existing feature extraction)
-        print(f"Extracting CV features...")
+        # extract features
+        print(f"extracting cv features...")
         cv_features = extract_all_features(processed_file)
-        print(f"CV features extracted: {list(cv_features.keys())}")
+        print(f"cv features extracted: {list(cv_features.keys())}")
         
-        # add to database (uses your existing database methods)
+        # add to database
         file_path = f"data/wardrobe/{user_id}/bg_removed/{clothing_id}_bg_removed.png"
-        print(f"Adding to database...")
+        print(f"adding to database...")
         wardrobe_item_id = db.add_wardrobe_item(user_id, clothing_id, item_type, file_path, cv_features)
-        print(f"Added to database with ID: {wardrobe_item_id}")
+        print(f"added to database with id: {wardrobe_item_id}")
         
-        # extract genai features (uses your existing genai extraction)
+        # extract genai features
         try:
-            print(f"Extracting GenAI features...")
+            print(f"extracting genai features...")
             genai_features = extract_genai_features(processed_file)
             db.add_genai_features(wardrobe_item_id, genai_features)
-            print(f"GenAI features added")
+            print(f"genai features added")
         except Exception as e:
-            print(f"GenAI feature extraction failed (non-critical): {e}")
+            print(f"genai feature extraction failed (non-critical): {e}")
         
-        # ONLY clear predictions (not features or transformer)
-        print(f"Clearing prediction cache...")
+        # only clear predictions (not features or transformer)
+        print(f"clearing prediction cache...")
         db.clear_outfit_predictions(user_id)
         
-        # DON'T rebuild transformer or pre-compute features
-        # They will be computed lazily as outfits are requested
+        # don't rebuild transformer or pre-compute features
+        # they will be computed lazily as outfits are requested
         
-        # Retrain model if enough ratings
+        # retrain model if enough ratings
         ratings = db.get_all_ratings(user_id)
         if len(ratings) >= 5:
-            print(f"Retraining model...")
+            print(f"retraining model...")
             try:
                 from src.recommender.random_forest import train_user_model_from_ratings
                 train_user_model_from_ratings(user_id, db, min_ratings=5)
-                print(f"Model retrained successfully")
+                print(f"model retrained successfully")
             except Exception as e:
-                print(f"Model retraining failed: {e}")
+                print(f"model retraining failed: {e}")
         
-        print(f"=== UPLOAD SUCCESS ===\n")
+        print(f"=== upload success ===\n")
         
         return {
             "success": True,
@@ -222,15 +223,15 @@ async def add_wardrobe_item(
         }
         
     except Exception as e:
-        print(f"\n=== UPLOAD ERROR ===")
-        print(f"Error: {e}")
+        print(f"\n=== upload error ===")
+        print(f"error: {e}")
         traceback.print_exc()
         print(f"===================\n")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/wardrobe/items/{clothing_id}")
 def delete_wardrobe_item(clothing_id: str):
-    """delete wardrobe item - uses your existing db.delete_wardrobe_item()"""
+    """delete wardrobe item - soft delete in database"""
     
     try:
         # check if item exists
@@ -240,31 +241,31 @@ def delete_wardrobe_item(clothing_id: str):
         if not item:
             raise HTTPException(status_code=404, detail="clothing item not found")
         
-        print(f"\n=== DELETING {clothing_id} ===")
+        print(f"\n=== deleting {clothing_id} ===")
         
-        # delete using your existing method
+        # delete from database
         db.delete_wardrobe_item(user_id, clothing_id)
-        print(f"Item soft-deleted from database")
+        print(f"item soft-deleted from database")
         
-        # ONLY clear predictions (not features or transformer)
+        # only clear predictions (not features or transformer)
         db.clear_outfit_predictions(user_id)
-        print(f"Cleared prediction cache")
+        print(f"cleared prediction cache")
         
-        # DON'T rebuild transformer or pre-compute features
-        # Old cached features will just be ignored
+        # don't rebuild transformer or pre-compute features
+        # old cached features will just be ignored
         
-        # Retrain model with updated data
+        # retrain model with updated data
         ratings = db.get_all_ratings(user_id)
         if len(ratings) >= 5:
-            print(f"Retraining model...")
+            print(f"retraining model...")
             try:
                 from src.recommender.random_forest import train_user_model_from_ratings
                 train_user_model_from_ratings(user_id, db, min_ratings=5)
-                print(f"Model retrained successfully")
+                print(f"model retrained successfully")
             except Exception as e:
-                print(f"Model retraining failed: {e}")
+                print(f"model retraining failed: {e}")
         
-        print(f"=== DELETE SUCCESS ===\n")
+        print(f"=== delete success ===\n")
         
         return {
             "success": True,
@@ -272,18 +273,17 @@ def delete_wardrobe_item(clothing_id: str):
         }
         
     except Exception as e:
-        print(f"\n=== DELETE ERROR ===")
-        print(f"Error: {e}")
+        print(f"\n=== delete error ===")
+        print(f"error: {e}")
         traceback.print_exc()
         print(f"===================\n")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/outfits/random")
 def get_random_outfit():
-    """generate random outfit - uses your existing CachedOutfitGenerator"""
+    """generate random outfit"""
     
     try:
-        # use your existing outfit generator
         generator = CachedOutfitGenerator(user_id, db)
         outfit = generator.get_random_outfit()
         
@@ -297,10 +297,9 @@ def get_random_outfit():
 
 @app.post("/outfits/complete")
 def complete_outfit(request: OutfitRequest):
-    """generate outfit with chosen item - uses your existing CachedOutfitGenerator"""
+    """generate outfit with chosen item"""
     
     try:
-        # use your existing outfit generator
         generator = CachedOutfitGenerator(user_id, db)
         outfit = generator.complete_outfit(request.item_type, request.item_id)
         
@@ -314,10 +313,9 @@ def complete_outfit(request: OutfitRequest):
 
 @app.post("/outfits/rate")
 def rate_outfit(rating: OutfitRating):
-    """save outfit rating - uses your existing db.save_outfit_rating()"""
+    """save outfit rating"""
     
     try:
-        # use your existing rating save method
         db.save_outfit_rating(
             user_id,
             rating.shirt_id,
@@ -328,7 +326,7 @@ def rate_outfit(rating: OutfitRating):
             notes=rating.notes
         )
         
-        # check for model retraining (uses your existing logic)
+        # check for model retraining
         ratings = db.get_all_ratings(user_id)
         rating_count = len(ratings)
         
@@ -346,7 +344,7 @@ def rate_outfit(rating: OutfitRating):
 
 @app.post("/model/retrain")
 def retrain_model():
-    """retrain ML model - uses your existing train_user_model_from_ratings()"""
+    """retrain ml model"""
     
     try:
         from src.recommender.random_forest import train_user_model_from_ratings
@@ -377,11 +375,10 @@ def retrain_model():
 
 @app.get("/ratings")
 def get_ratings():
-    """get all user ratings - uses your existing db.get_all_ratings()"""
+    """get all user ratings"""
     ratings = db.get_all_ratings(user_id)
     return ratings
 
-# serve images for the mobile app
 @app.get("/images/{clothing_id}")
 def get_clothing_image(clothing_id: str):
     """serve clothing images to mobile app"""
@@ -396,21 +393,21 @@ def get_clothing_image(clothing_id: str):
 
 @app.get("/wardrobe/items/{clothing_id}/features")
 def get_item_features(clothing_id: str):
-    """Get detailed features for a specific clothing item"""
+    """get detailed features for a specific clothing item"""
     
     try:
-        # Get wardrobe item
+        # get wardrobe item
         items = db.get_wardrobe_items(user_id)
         item = next((i for i in items if i['clothing_id'] == clothing_id), None)
         
         if not item:
-            raise HTTPException(status_code=404, detail="Item not found")
+            raise HTTPException(status_code=404, detail="item not found")
         
-        # Get GenAI features
+        # get genai features
         genai_data = db.get_genai_features(user_id)
         genai_item = next((g for g in genai_data if g['clothing_id'] == clothing_id), None)
         
-        # Combine CV and GenAI features
+        # combine cv and genai features
         features = {
             'clothing_id': clothing_id,
             'item_type': item['item_type'],
@@ -424,23 +421,23 @@ def get_item_features(clothing_id: str):
                 'fit_type': genai_item.get('fit_type'),
             })
         
-        # Calculate closest palette for this single item
+        # calculate closest palette for this single item
         from src.feature_extraction.feature_engineering import OutfitFeatureEngine
         import pandas as pd
         
         engine = OutfitFeatureEngine(user_id, db)
         
-        # Create a minimal dataframe with just this item's colors
+        # create a minimal dataframe with just this item's colours
         item_df = pd.DataFrame([{
             'shirt_id': clothing_id if item['item_type'] == 'shirt' else 'dummy_shirt',
             'pants_id': clothing_id if item['item_type'] == 'pants' else 'dummy_pants',
             'shoes_id': clothing_id if item['item_type'] == 'shoes' else 'dummy_shoes',
         }])
         
-        # Get clothing features (which includes colors)
+        # get clothing features (which includes colours)
         item_with_features = engine.get_clothing_features_from_db(item_df)
         
-        # Find closest palette using the engine's method
+        # find closest palette using the engine's method
         palettes = db.get_color_palettes()
         
         if palettes and item.get('dominant_color'):
@@ -484,7 +481,7 @@ def get_item_features(clothing_id: str):
         return features
         
     except Exception as e:
-        print(f"Error fetching features: {e}")
+        print(f"error fetching features: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

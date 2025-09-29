@@ -249,6 +249,6 @@ def cleanup_orphaned_files(user_id, db):
 
 if __name__ == "__main__":
     # for testing
-    from database.models import WardrobeDB
+    from data.database.models import WardrobeDB
     db = WardrobeDB()
     interactive_wardrobe_management(1, db)

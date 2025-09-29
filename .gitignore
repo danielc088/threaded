@@ -1,55 +1,62 @@
+# python virtual environments
 venv/
+.venv/
 __pycache__/
-.env
 *.pyc
 *.pyo
-.DS_Store
-*.log
 
+# saved ML model files (can be large)
 *.pkl
 *.joblib
 *.h5
 *.pt
 *.pth
 models/
-*.db
-*.sqlite
 
+# node packages and lock files (reinstall from package.json)
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+package-lock.json
+yarn.lock
 
+# expo build artifacts and cache
 .expo/
 .expo-shared/
 dist/
 web-build/
 
+# environment variables with secrets
+.env
 .env.local
 .env.*.local
 
-.venv/
+# database files (regenerate from migrations)
+*.db
+*.sqlite
+data/database/threaded.db
+
+# IDE and editor config files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
+# OS junk files
+.DS_Store
 Thumbs.db
 
+# log files from various tools
 *.log
 logs/
 
+# user uploaded content
 uploads/
 images/
 static/images/
 
+# compressed archives
 *.zip
 *.tar.gz
-
-data/database/threaded.db
-models/
-
-node_modules/
-package-lock.json
-yarn.lock

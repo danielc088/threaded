@@ -394,6 +394,101 @@ def get_clothing_image(clothing_id: str):
     else:
         raise HTTPException(status_code=404, detail="image not found")
 
+@app.get("/wardrobe/items/{clothing_id}/features")
+def get_item_features(clothing_id: str):
+    """Get detailed features for a specific clothing item"""
+    
+    try:
+        # Get wardrobe item
+        items = db.get_wardrobe_items(user_id)
+        item = next((i for i in items if i['clothing_id'] == clothing_id), None)
+        
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
+        
+        # Get GenAI features
+        genai_data = db.get_genai_features(user_id)
+        genai_item = next((g for g in genai_data if g['clothing_id'] == clothing_id), None)
+        
+        # Combine CV and GenAI features
+        features = {
+            'clothing_id': clothing_id,
+            'item_type': item['item_type'],
+            'dominant_color': item.get('dominant_color'),
+            'secondary_color': item.get('secondary_color'),
+        }
+        
+        if genai_item:
+            features.update({
+                'style': genai_item.get('style'),
+                'fit_type': genai_item.get('fit_type'),
+            })
+        
+        # Calculate closest palette for this single item
+        from src.feature_extraction.feature_engineering import OutfitFeatureEngine
+        import pandas as pd
+        
+        engine = OutfitFeatureEngine(user_id, db)
+        
+        # Create a minimal dataframe with just this item's colors
+        item_df = pd.DataFrame([{
+            'shirt_id': clothing_id if item['item_type'] == 'shirt' else 'dummy_shirt',
+            'pants_id': clothing_id if item['item_type'] == 'pants' else 'dummy_pants',
+            'shoes_id': clothing_id if item['item_type'] == 'shoes' else 'dummy_shoes',
+        }])
+        
+        # Get clothing features (which includes colors)
+        item_with_features = engine.get_clothing_features_from_db(item_df)
+        
+        # Find closest palette using the engine's method
+        palettes = db.get_color_palettes()
+        
+        if palettes and item.get('dominant_color'):
+            best_palette = None
+            best_distance = float('inf')
+            
+            outfit_color = item.get('dominant_color')
+            outfit_lab = engine.hex_to_lab(outfit_color)
+            
+            if outfit_lab:
+                for palette in palettes:
+                    palette_colors = []
+                    for i in range(1, 6):
+                        color = palette.get(f'color_{i}')
+                        if color:
+                            palette_colors.append(color)
+                    
+                    if not palette_colors:
+                        continue
+                    
+                    palette_distances = []
+                    for palette_color in palette_colors:
+                        palette_lab = engine.hex_to_lab(palette_color)
+                        if palette_lab:
+                            try:
+                                from colormath.color_diff import delta_e_cie2000
+                                dist = float(delta_e_cie2000(outfit_lab, palette_lab))
+                                palette_distances.append(dist)
+                            except:
+                                continue
+                    
+                    if palette_distances:
+                        min_dist = min(palette_distances)
+                        if min_dist < best_distance:
+                            best_distance = min_dist
+                            best_palette = palette['name']
+                
+                if best_palette:
+                    features['closest_palette'] = best_palette
+        
+        return features
+        
+    except Exception as e:
+        print(f"Error fetching features: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,4 +1,4 @@
-// app/index.tsx - Main React Native app (TypeScript version) - CLEAN VERSION
+// Improved React Native app with your requested changes
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -9,8 +9,8 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -94,32 +94,48 @@ interface MainMenuScreenProps {
 
 const MainMenuScreen: React.FC<MainMenuScreenProps> = ({ stats, setCurrentScreen }) => {
   return (
-    <ScrollView style={styles.screen}>
-      <Text style={styles.asciiArt}>
-        {`         _______  __   __  ______    _______  _______  ______   _______  ______  
-        |       ||  | |  ||    _ |  |       ||   _   ||      | |       ||      | 
-        |_     _||  |_|  ||   | ||  |    ___||  |_|  ||  _    ||    ___||  _    |
-          |   |  |       ||   |_||_ |   |___ |       || | |   ||   |___ | | |   |
-          |   |  |       ||    __  ||    ___||       || |_|   ||    ___|| |_|   |
-          |   |  |   _   ||   |  | ||   |___ |   _   ||       ||   |___ |       |
-          |___|  |__| |__||___|  |_||_______||__| |__||______| |_______||______| 
+    <ScrollView style={styles.screen} contentContainerStyle={styles.centerContent}>
+      <View style={styles.logoContainer}>
+        <Text style={styles.asciiArt}>
+{` _______  __   __  ______    _______  _______  ______   _______  ______  
+|       ||  | |  ||    _ |  |       ||   _   ||      | |       ||      | 
+|_     _||  |_|  ||   | ||  |    ___||  |_|  ||  _    ||    ___||  _    |
+  |   |  |       ||   |_||_ |   |___ |       || | |   ||   |___ | | |   |
+  |   |  |       ||    __  ||    ___||       || |_|   ||    ___|| |_|   |
+  |   |  |   _   ||   |  | ||   |___ |   _   ||       ||   |___ |       |
+  |___|  |__| |__||___|  |_||_______||__| |__||______| |_______||______| `}
+        </Text>
+        
+        <Text style={styles.asciiSubtitle}>a project by daniel cao</Text>
+      </View>
 
-                              a project by daniel cao`}
-      </Text>
+      {stats && (
+        <View style={styles.statsContainer}>
+          <Text style={styles.statsText}>
+            {`wardrobe: ${stats.total_items || 0} items`}
+          </Text>
+          <Text style={styles.statsText}>
+            {`ratings given: ${stats.total_ratings}`}
+          </Text>
+          <Text style={styles.statsText}>
+            {`ratings until next model update: ${5 - (stats.total_ratings % 5)}`}
+          </Text>
+        </View>
+      )}
 
-      <Text style={styles.menuHeader}>MAIN MENU:</Text>
+      <View style={styles.menuButtonsContainer}>
+        <TouchableOpacity style={styles.menuButton} onPress={() => setCurrentScreen('manage')}>
+          <Text style={styles.menuButtonText}>manage wardrobe</Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity style={styles.menuButton} onPress={() => setCurrentScreen('manage')}>
-        <Text style={styles.menuButtonText}>manage wardrobe</Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.menuButton} onPress={() => setCurrentScreen('random')}>
+          <Text style={styles.menuButtonText}>random recommendation</Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity style={styles.menuButton} onPress={() => setCurrentScreen('random')}>
-        <Text style={styles.menuButtonText}>random outfit</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.menuButton} onPress={() => setCurrentScreen('chosen')}>
-        <Text style={styles.menuButtonText}>outfit with chosen item</Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.menuButton} onPress={() => setCurrentScreen('chosen')}>
+          <Text style={styles.menuButtonText}>chosen item recommendation</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 };
@@ -130,12 +146,28 @@ interface ManageWardrobeScreenProps {
   loadStats: () => Promise<void>;
 }
 
+interface ItemFeatures {
+  dominant_color?: string;
+  secondary_color?: string;
+  avg_brightness?: number;
+  avg_saturation?: number;
+  pattern_type?: string;
+  style?: string;
+  fit_type?: string;
+  formality_score?: number;
+  versatility_score?: number;
+  closest_palette?: string;
+}
+
 const ManageWardrobeScreen: React.FC<ManageWardrobeScreenProps> = ({ setCurrentScreen, loadStats }) => {
   const [category, setCategory] = useState<string>('shirt');
   const [items, setItems] = useState<WardrobeItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [mode, setMode] = useState<'view' | 'delete' | 'add'>('view');
   const [uploadStep, setUploadStep] = useState<'initial' | 'uploading' | 'processing' | 'complete'>('initial');
+  const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [modalImage, setModalImage] = useState<string>('');
+  const [itemFeatures, setItemFeatures] = useState<ItemFeatures | null>(null);
 
   useEffect(() => {
     loadItems();
@@ -155,53 +187,63 @@ const ManageWardrobeScreen: React.FC<ManageWardrobeScreenProps> = ({ setCurrentS
   };
 
   const deleteItem = async (clothingId: string): Promise<void> => {
-    const confirmed = typeof window !== 'undefined' && window.confirm
-      ? window.confirm(`Are you sure you want to delete ${clothingId}?`)
-      : false;
-    
-    if (!confirmed) {
-      Alert.alert(
-        'Delete Item',
-        `Are you sure you want to delete ${clothingId}?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: async () => {
-              await performDelete(clothingId);
-            },
+    Alert.alert(
+      'Delete Item',
+      `Are you sure you want to delete ${clothingId}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await performDelete(clothingId);
           },
-        ]
-      );
-      return;
-    }
-    
-    await performDelete(clothingId);
+        },
+      ]
+    );
   };
 
   const performDelete = async (clothingId: string): Promise<void> => {
-    console.log('Deleting:', clothingId);
     try {
       const response = await fetch(`${API_BASE}/wardrobe/items/${clothingId}`, {
         method: 'DELETE',
       });
       
-      console.log('Delete response status:', response.status);
       const result = await response.json();
-      console.log('Delete result:', result);
       
       if (response.ok) {
-        alert(`Successfully deleted ${clothingId}`);
+        Alert.alert('Success', `Successfully deleted ${clothingId}`);
         await loadItems();
         await loadStats();
       } else {
-        console.error('Delete failed:', result);
-        alert(`Error: ${result.detail || 'Failed to delete item'}`);
+        Alert.alert('Error', result.detail || 'Failed to delete item');
       }
     } catch (error) {
-      console.error('Delete error:', error);
-      alert(`Failed to delete item: ${error}`);
+      Alert.alert('Error', `Failed to delete item: ${error}`);
+    }
+  };
+
+  const openImageModal = (clothingId: string) => {
+    setModalImage(clothingId);
+    setModalVisible(true);
+    // Fetch item features
+    fetchItemFeatures(clothingId);
+  };
+
+  const fetchItemFeatures = async (clothingId: string) => {
+    try {
+      const response = await fetch(`${API_BASE}/wardrobe/items/${clothingId}/features`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Fetched features:', data); // Debug log
+        setItemFeatures(data);
+      } else {
+        console.log('Failed to fetch features, status:', response.status);
+        setItemFeatures(null);
+      }
+    } catch (error) {
+      console.log('Could not fetch item features:', error);
+      setItemFeatures(null);
     }
   };
 
@@ -209,54 +251,39 @@ const ManageWardrobeScreen: React.FC<ManageWardrobeScreenProps> = ({ setCurrentS
     if (mode !== 'add') return;
     
     try {
-      const isWeb = typeof window !== 'undefined' && !window.navigator.userAgent.includes('Mobile');
+      const ImagePicker = await import('expo-image-picker');
       
-      if (isWeb) {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        
-        input.onchange = async (e: any) => {
-          const file = e.target.files[0];
-          if (file) {
-            uploadImageWeb(file);
-          }
-        };
-        
-        input.click();
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission needed', 'Camera permission is required to take photos');
+          return;
+        }
       } else {
-        if (source === 'camera') {
-          const { status } = await ImagePicker.requestCameraPermissionsAsync();
-          if (status !== 'granted') {
-            Alert.alert('Permission needed', 'Camera permission is required to take photos');
-            return;
-          }
-        } else {
-          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (status !== 'granted') {
-            Alert.alert('Permission needed', 'Gallery permission is required to select photos');
-            return;
-          }
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission needed', 'Gallery permission is required to select photos');
+          return;
         }
+      }
 
-        const result = source === 'camera' 
-          ? await ImagePicker.launchCameraAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              allowsEditing: true,
-              aspect: [3, 4],
-              quality: 0.8,
-            })
-          : await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              allowsEditing: true,
-              aspect: [3, 4],
-              quality: 0.8,
-            });
+      const result = source === 'camera' 
+        ? await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [3, 4],
+            quality: 0.8,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [3, 4],
+            quality: 0.8,
+          });
 
-        if (!result.canceled && result.assets && result.assets.length > 0) {
-          const selectedImage = result.assets[0];
-          uploadImageMobile(selectedImage.uri);
-        }
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedImage = result.assets[0];
+        uploadImage(selectedImage.uri);
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to pick image');
@@ -264,24 +291,28 @@ const ManageWardrobeScreen: React.FC<ManageWardrobeScreenProps> = ({ setCurrentS
     }
   };
 
-  const uploadImageWeb = async (file: File): Promise<void> => {
+  const uploadImage = async (imageUri: string): Promise<void> => {
     setUploadStep('uploading');
-    
-    console.log('Starting web upload...');
-    console.log('File:', file.name, file.type, file.size);
     
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      const filename = imageUri.split('/').pop() || 'image.jpg';
+      
+      formData.append('file', {
+        uri: imageUri,
+        name: filename,
+        type: 'image/jpeg',
+      } as any);
 
       const response = await fetch(`${API_BASE}/wardrobe/items?item_type=${category}`, {
         method: 'POST',
         body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
-      console.log('Upload status:', response.status);
       const result = await response.json();
-      console.log('Upload result:', result);
 
       if (response.ok) {
         setUploadStep('processing');
@@ -303,65 +334,6 @@ const ManageWardrobeScreen: React.FC<ManageWardrobeScreenProps> = ({ setCurrentS
         setUploadStep('initial');
       }
     } catch (error) {
-      console.error('Upload exception:', error);
-      Alert.alert('Error', `Failed to upload: ${error}`);
-      setMode('view');
-      setUploadStep('initial');
-    }
-  };
-
-  const uploadImageMobile = async (imageUri: string): Promise<void> => {
-    setUploadStep('uploading');
-    
-    console.log('Starting mobile upload...');
-    console.log('Image URI:', imageUri);
-    
-    try {
-      const FileSystem = require('expo-file-system/legacy');
-      
-      const uploadResult = await FileSystem.uploadAsync(
-        `${API_BASE}/wardrobe/items?item_type=${category}`,
-        imageUri,
-        {
-          fieldName: 'file',
-          httpMethod: 'POST',
-          uploadType: 1,
-        }
-      );
-
-      console.log('Upload status:', uploadResult.status);
-      console.log('Upload body:', uploadResult.body);
-
-      if (uploadResult.status === 200) {
-        const result = JSON.parse(uploadResult.body);
-        setUploadStep('processing');
-        
-        setTimeout(() => {
-          setUploadStep('complete');
-          
-          setTimeout(() => {
-            setMode('view');
-            setUploadStep('initial');
-            loadItems();
-            loadStats();
-            Alert.alert('Success!', result.message || `${category} added to wardrobe!`);
-          }, 2000);
-        }, 2000);
-      } else {
-        let errorMsg = 'Upload failed';
-        try {
-          const errorBody = JSON.parse(uploadResult.body);
-          errorMsg = errorBody.detail || errorBody.message || errorMsg;
-        } catch (e) {
-          errorMsg = uploadResult.body || errorMsg;
-        }
-        
-        Alert.alert('Upload Failed', errorMsg);
-        setMode('view');
-        setUploadStep('initial');
-      }
-    } catch (error) {
-      console.error('Upload exception:', error);
       Alert.alert('Error', `Failed to upload: ${error}`);
       setMode('view');
       setUploadStep('initial');
@@ -480,22 +452,20 @@ const ManageWardrobeScreen: React.FC<ManageWardrobeScreenProps> = ({ setCurrentS
           </Text>
           
           <View style={styles.imageGrid}>
-            {items.map((item, index) => (
+            {items.map((item) => (
               <View key={item.id} style={mode === 'delete' ? styles.gridImageItemWithDelete : styles.gridImageItem}>
-                <Image 
-                  source={{ uri: `${API_BASE}/images/${item.clothing_id}` }}
-                  style={styles.gridImageLarge}
-                  resizeMode="contain"
-                />
-                <Text style={styles.gridImageText}>{(index + 1).toString()}</Text>
+                <TouchableOpacity onPress={() => openImageModal(item.clothing_id)}>
+                  <Image 
+                    source={{ uri: `${API_BASE}/images/${item.clothing_id}` }}
+                    style={styles.gridImageLarge}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
                 
                 {mode === 'delete' && (
                   <TouchableOpacity 
                     style={styles.deleteButtonGrid} 
-                    onPress={() => {
-                      console.log('DELETE CLICKED for:', item.clothing_id);
-                      deleteItem(item.clothing_id);
-                    }}
+                    onPress={() => deleteItem(item.clothing_id)}
                   >
                     <Text style={styles.deleteButtonText}>DELETE</Text>
                   </TouchableOpacity>
@@ -504,13 +474,83 @@ const ManageWardrobeScreen: React.FC<ManageWardrobeScreenProps> = ({ setCurrentS
             ))}
           </View>
           
-          <Text style={styles.itemsFooter}>╰────────────────────────────────────────────╯</Text>
         </View>
       )}
 
       <TouchableOpacity style={styles.backButton} onPress={() => setCurrentScreen('menu')}>
         <Text style={styles.backButtonText}>← back to main menu</Text>
       </TouchableOpacity>
+
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setModalVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <Image 
+              source={{ uri: `${API_BASE}/images/${modalImage}` }}
+              style={styles.modalImage}
+              resizeMode="contain"
+            />
+            <Text style={styles.modalText}>{modalImage}</Text>
+            
+            {itemFeatures && (
+              <View style={styles.featuresContainer}>
+                <Text style={styles.featuresHeader}>KEY FEATURES</Text>
+                
+                <View style={styles.featuresGrid}>
+                  {itemFeatures.dominant_color && (
+                    <View style={styles.featureItem}>
+                      <Text style={styles.featureLabel}>Dominant Color:</Text>
+                      <View style={[styles.colorSwatch, { backgroundColor: itemFeatures.dominant_color }]} />
+                    </View>
+                  )}
+                  
+                  {itemFeatures.secondary_color && (
+                    <View style={styles.featureItem}>
+                      <Text style={styles.featureLabel}>Secondary Color:</Text>
+                      <View style={[styles.colorSwatch, { backgroundColor: itemFeatures.secondary_color }]} />
+                    </View>
+                  )}
+                  
+                  {itemFeatures.closest_palette && (
+                    <View style={styles.featureItem}>
+                      <Text style={styles.featureLabel}>Closest Palette:</Text>
+                      <Text style={styles.featureValue}>{itemFeatures.closest_palette}</Text>
+                    </View>
+                  )}
+                  
+                  {itemFeatures.fit_type && itemFeatures.fit_type !== 'N/A' && (
+                    <View style={styles.featureItem}>
+                      <Text style={styles.featureLabel}>Fit:</Text>
+                      <Text style={styles.featureValue}>{itemFeatures.fit_type}</Text>
+                    </View>
+                  )}
+                  
+                  {itemFeatures.style && (
+                    <View style={styles.featureItem}>
+                      <Text style={styles.featureLabel}>Style:</Text>
+                      <Text style={styles.featureValue}>{itemFeatures.style}</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+            
+            <TouchableOpacity 
+              style={styles.modalCloseButton}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={styles.modalCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </ScrollView>
   );
 };
@@ -548,13 +588,13 @@ const RandomOutfitScreen: React.FC<RandomOutfitScreenProps> = ({ setCurrentScree
 
   return (
     <ScrollView style={styles.screen}>
-      <Text style={styles.sectionHeader}>╭─ random outfit ───────────────────────────────╮</Text>
+      <Text style={styles.sectionHeader}>╭─ random recommendation ───────────────────────╮</Text>
 
       <View style={styles.generateContainer}>
         {loading ? (
           <>
             <ActivityIndicator size="large" color="#00ff41" />
-            <Text style={styles.generateText}>generating your random outfit...</Text>
+            <Text style={styles.generateText}>generating your random recommendation...</Text>
           </>
         ) : (
           <>
@@ -631,7 +671,7 @@ const ChosenOutfitScreen: React.FC<ChosenOutfitScreenProps> = ({ setCurrentScree
 
   return (
     <ScrollView style={styles.screen}>
-      <Text style={styles.sectionHeader}>╭─ outfit with chosen item ─────────────────────╮</Text>
+      <Text style={styles.sectionHeader}>╭─ chosen item recommendation ──────────────────╮</Text>
 
       <Text style={styles.prompt}>choose item type to keep:</Text>
 
@@ -689,31 +729,15 @@ interface OutfitDisplayScreenProps {
 const OutfitDisplayScreen: React.FC<OutfitDisplayScreenProps> = ({ setCurrentScreen, loadStats, currentOutfit }) => {
   const [hasRated, setHasRated] = useState<boolean>(false);
   const [userRating, setUserRating] = useState<number | null>(null);
+  const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [modalImage, setModalImage] = useState<string>('');
 
   useEffect(() => {
     if (currentOutfit) {
       setHasRated(false);
       setUserRating(null);
-      showRatingPopup();
     }
   }, [currentOutfit]);
-
-  const showRatingPopup = (): void => {
-    if (!currentOutfit) return;
-
-    Alert.alert(
-      'RATE THIS OUTFIT',
-      `How much do you like this outfit combination?\n\n${currentOutfit.shirt} + ${currentOutfit.pants} + ${currentOutfit.shoes}`,
-      [
-        { text: 'Skip Rating', style: 'cancel' },
-        { text: '1 Star', onPress: () => rateOutfit(1) },
-        { text: '2 Stars', onPress: () => rateOutfit(2) },
-        { text: '3 Stars', onPress: () => rateOutfit(3) },
-        { text: '4 Stars', onPress: () => rateOutfit(4) },
-        { text: '5 Stars', onPress: () => rateOutfit(5) },
-      ]
-    );
-  };
 
   const rateOutfit = async (rating: number): Promise<void> => {
     if (!currentOutfit) return;
@@ -744,14 +768,12 @@ const OutfitDisplayScreen: React.FC<OutfitDisplayScreenProps> = ({ setCurrentScr
           Alert.alert('Rating Saved!', message, [{ text: 'OK' }]);
           
           try {
-            console.log('Auto-retraining model...');
             const retrainResponse = await fetch(`${API_BASE}/model/retrain`, {
               method: 'POST',
             });
             const retrainResult = await retrainResponse.json();
             
             if (retrainResult.success) {
-              console.log('Model retrained successfully!', retrainResult);
               Alert.alert('Model Updated!', `New model trained with ${result.rating_count} ratings. Accuracy: ${(retrainResult.accuracy * 100).toFixed(1)}%`);
             }
           } catch (retrainError) {
@@ -770,6 +792,11 @@ const OutfitDisplayScreen: React.FC<OutfitDisplayScreenProps> = ({ setCurrentScr
     }
   };
 
+  const openImageModal = (clothingId: string) => {
+    setModalImage(clothingId);
+    setModalVisible(true);
+  };
+
   if (!currentOutfit) {
     return (
       <View style={styles.screen}>
@@ -783,7 +810,7 @@ const OutfitDisplayScreen: React.FC<OutfitDisplayScreenProps> = ({ setCurrentScr
 
   return (
     <ScrollView style={styles.screen}>
-      <Text style={styles.sectionHeader}>╭─ your outfit ─────────────────────────────────╮</Text>
+      <Text style={styles.sectionHeader}>╭─ your recommendation ─────────────────────────╮</Text>
 
       <View style={styles.outfitDisplay}>
         <Text style={styles.outfitHeader}>generated outfit</Text>
@@ -798,38 +825,44 @@ ${currentOutfit.fixed_item ? `fixed:  ${currentOutfit.fixed_item}` : ''}`}
         </Text>
 
         <View style={styles.outfitImagesVertical}>
-          <View style={styles.outfitImageContainerVertical}>
+          <TouchableOpacity 
+            style={styles.outfitImageContainerVertical}
+            onPress={() => openImageModal(currentOutfit.shirt)}
+          >
             <Text style={styles.outfitImageLabel}>SHIRT</Text>
             <Image 
               source={{ uri: `${API_BASE}/images/${currentOutfit.shirt}` }}
-              style={styles.outfitImageLarge}
+              style={styles.outfitImageExtraLarge}
               resizeMode="contain"
             />
-            <Text style={styles.outfitImageId}>{currentOutfit.shirt}</Text>
-          </View>
+          </TouchableOpacity>
           
-          <View style={styles.outfitImageContainerVertical}>
+          <TouchableOpacity 
+            style={styles.outfitImageContainerVertical}
+            onPress={() => openImageModal(currentOutfit.pants)}
+          >
             <Text style={styles.outfitImageLabel}>PANTS</Text>
             <Image 
               source={{ uri: `${API_BASE}/images/${currentOutfit.pants}` }}
-              style={styles.outfitImageLarge}
+              style={styles.outfitImageExtraLarge}
               resizeMode="contain"
             />
-            <Text style={styles.outfitImageId}>{currentOutfit.pants}</Text>
-          </View>
+          </TouchableOpacity>
           
-          <View style={styles.outfitImageContainerVertical}>
+          <TouchableOpacity 
+            style={styles.outfitImageContainerVertical}
+            onPress={() => openImageModal(currentOutfit.shoes)}
+          >
             <Text style={styles.outfitImageLabel}>SHOES</Text>
             <Image 
               source={{ uri: `${API_BASE}/images/${currentOutfit.shoes}` }}
-              style={styles.outfitImageLarge}
+              style={styles.outfitImageExtraLarge}
               resizeMode="contain"
             />
-            <Text style={styles.outfitImageId}>{currentOutfit.shoes}</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
-<Text style={styles.ratingHeader}>please rate this outfit:</Text>
+        <Text style={styles.ratingHeader}>please rate this outfit:</Text>
         <Text style={styles.ratingSubtext}>1 = hate it, 5 = love it</Text>
 
         <View style={styles.ratingButtons}>
@@ -859,17 +892,38 @@ ${currentOutfit.fixed_item ? `fixed:  ${currentOutfit.fixed_item}` : ''}`}
             </Text>
           </View>
         )}
-
-        <TouchableOpacity style={styles.rateAgainButton} onPress={showRatingPopup}>
-          <Text style={styles.rateAgainButtonText}>
-            {hasRated ? 'change rating' : 'rate again'}
-          </Text>
-        </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.backButton} onPress={() => setCurrentScreen('menu')}>
         <Text style={styles.backButtonText}>← back to main menu</Text>
       </TouchableOpacity>
+
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setModalVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <Image 
+              source={{ uri: `${API_BASE}/images/${modalImage}` }}
+              style={styles.modalImage}
+              resizeMode="contain"
+            />
+            <Text style={styles.modalText}>{modalImage}</Text>
+            <TouchableOpacity 
+              style={styles.modalCloseButton}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={styles.modalCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </ScrollView>
   );
 };
@@ -885,27 +939,49 @@ const styles = StyleSheet.create({
     padding: 25,
     backgroundColor: '#000000',
   },
+  centerContent: {
+    alignItems: 'center',
+  },
+  logoContainer: {
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 20,
+  },
   asciiArt: {
     color: '#00ff41',
     fontFamily: 'Courier',
-    fontSize: 12,
-    textAlign: 'center',
-    marginBottom: 30,
+    fontSize: 11,
+    textAlign: 'left',
     marginTop: 50,
+    marginBottom: 10,
   },
-  sectionHeader: {
+  asciiSubtitle: {
     color: '#00ff41',
     fontFamily: 'Courier',
-    fontSize: 18,
+    fontSize: 16,
     textAlign: 'center',
-    marginBottom: 30,
-    marginTop: 50,
+    marginTop: 5,
   },
-  menuHeader: {
-    color: '#00ff41',
-    fontFamily: 'Courier',
-    fontSize: 20,
+  statsContainer: {
+    backgroundColor: '#001a00',
+    borderColor: '#00cc33',
+    borderWidth: 2,
+    padding: 15,
+    borderRadius: 8,
     marginBottom: 20,
+    width: '100%',
+    maxWidth: 400,
+  },
+  statsText: {
+    color: '#00cc33',
+    fontFamily: 'Courier',
+    fontSize: 13,
+    marginBottom: 5,
+    textAlign: 'center',
+  },
+  menuButtonsContainer: {
+    width: '100%',
+    maxWidth: 400,
   },
   menuButton: {
     backgroundColor: '#001100',
@@ -914,11 +990,23 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 15,
     borderRadius: 5,
+    minHeight: 70,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   menuButtonText: {
     color: '#00ff41',
     fontFamily: 'Courier',
     fontSize: 18,
+    textAlign: 'center',
+  },
+  sectionHeader: {
+    color: '#00ff41',
+    fontFamily: 'Courier',
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 30,
+    marginTop: 50,
   },
   backButton: {
     backgroundColor: '#331100',
@@ -1067,13 +1155,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  gridImageText: {
-    color: '#00ff41',
-    fontFamily: 'Courier',
-    fontSize: 14,
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
   generateContainer: {
     borderColor: '#00ff41',
     borderWidth: 2,
@@ -1145,7 +1226,7 @@ const styles = StyleSheet.create({
   },
   outfitImageContainerVertical: {
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: 15,
     padding: 15,
     backgroundColor: '#002200',
     borderRadius: 10,
@@ -1159,16 +1240,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontWeight: 'bold',
   },
-  outfitImageLarge: {
-    width: 200,
-    height: 200,
+  outfitImageExtraLarge: {
+    width: 280,
+    height: 280,
     marginVertical: 10,
-  },
-  outfitImageId: {
-    color: '#00ff41',
-    fontFamily: 'Courier',
-    fontSize: 14,
-    marginTop: 5,
   },
   ratingHeader: {
     color: '#00ff41',
@@ -1240,21 +1315,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: 'bold',
   },
-  rateAgainButton: {
-    backgroundColor: '#444400',
-    borderColor: '#ffff00',
-    borderWidth: 2,
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 15,
-  },
-  rateAgainButtonText: {
-    color: '#ffff00',
-    fontFamily: 'Courier',
-    fontSize: 16,
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
   uploadContainer: {
     borderColor: '#00ff41',
     borderWidth: 2,
@@ -1279,8 +1339,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   uploadButton: {
-    backgroundColor: '#001155',
-    borderColor: '#00aaff',
+    backgroundColor: '#001a00',
+    borderColor: '#00cc33',
     borderWidth: 2,
     padding: 20,
     marginBottom: 15,
@@ -1288,7 +1348,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   uploadButtonText: {
-    color: '#00aaff',
+    color: '#00cc33',
     fontFamily: 'Courier',
     fontSize: 16,
     textAlign: 'center',
@@ -1316,6 +1376,111 @@ const styles = StyleSheet.create({
     fontFamily: 'Courier',
     fontSize: 16,
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#001100',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+    borderColor: '#00ff41',
+    borderWidth: 2,
+    width: '90%',
+    maxHeight: '90%',
+  },
+  modalImage: {
+    width: 300,
+    height: 300,
+    marginBottom: 15,
+  },
+  modalText: {
+    color: '#00ff41',
+    fontFamily: 'Courier',
+    fontSize: 16,
+    marginBottom: 20,
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  featuresContainer: {
+    width: '100%',
+    maxWidth: 350,
+    backgroundColor: '#002200',
+    borderRadius: 8,
+    padding: 20,
+    marginBottom: 20,
+    borderColor: '#00ff41',
+    borderWidth: 1,
+    alignSelf: 'center',
+  },
+  featuresHeader: {
+    color: '#00ff41',
+    fontFamily: 'Courier',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  featuresGrid: {
+    alignItems: 'center',
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    width: '100%',
+  },
+  featureLabel: {
+    color: '#00ff41',
+    fontFamily: 'Courier',
+    fontSize: 12,
+    flex: 1,
+  },
+  featureValue: {
+    color: '#00ff41',
+    fontFamily: 'Courier',
+    fontSize: 12,
+    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'right',
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  colorSwatch: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#00ff41',
+  },
+  featureText: {
+    color: '#00ff41',
+    fontFamily: 'Courier',
+    fontSize: 12,
+    marginBottom: 5,
+  },
+  modalCloseButton: {
+    backgroundColor: '#331100',
+    borderColor: '#ffaa00',
+    borderWidth: 2,
+    padding: 15,
+    borderRadius: 5,
+    width: '100%',
+  },
+  modalCloseText: {
+    color: '#ffaa00',
+    fontFamily: 'Courier',
+    fontSize: 16,
+    textAlign: 'center',
+    fontWeight: 'bold',
   },
 });
 

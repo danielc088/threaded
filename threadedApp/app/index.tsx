@@ -9,7 +9,6 @@ import {
   Image,
   ActivityIndicator,
   Modal,
-  FlatList,
 } from 'react-native';
 
 const API_BASE = 'http://localhost:8000';
@@ -30,6 +29,7 @@ interface WardrobeItem {
   id: number;
   clothing_id: string;
   item_type: string;
+  uploaded_at?: string;
 }
 
 interface Outfit {
@@ -61,13 +61,22 @@ interface ItemFeatures {
   formality_score?: number;
   versatility_score?: number;
   closest_palette?: string;
+  uploaded_at?: string;
 }
 
 type Tab = 'wardrobe' | 'outfits' | 'stats';
 
+interface LoadingState {
+  isLoading: boolean;
+  message: string;
+  submessage?: string;
+}
+
 const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<Tab>('wardrobe');
   const [stats, setStats] = useState<Stats | null>(null);
+  const [autoGenerateItem, setAutoGenerateItem] = useState<{type: string, id: string} | null>(null);
+  const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: false, message: '' });
 
   useEffect(() => {
     loadStats();
@@ -86,19 +95,31 @@ const App: React.FC = () => {
   const renderTab = () => {
     switch (currentTab) {
       case 'wardrobe':
-        return <WardrobeTab loadStats={loadStats} setCurrentTab={setCurrentTab} />;
+        return <WardrobeTab loadStats={loadStats} setCurrentTab={setCurrentTab} setAutoGenerateItem={setAutoGenerateItem} setLoadingState={setLoadingState} />;
       case 'outfits':
-        return <OutfitsTab loadStats={loadStats} />;
+        return <OutfitsTab loadStats={loadStats} autoGenerateItem={autoGenerateItem} setAutoGenerateItem={setAutoGenerateItem} setLoadingState={setLoadingState} />;
       case 'stats':
         return <StatsTab stats={stats} />;
       default:
-        return <WardrobeTab loadStats={loadStats} setCurrentTab={setCurrentTab} />;
+        return <WardrobeTab loadStats={loadStats} setCurrentTab={setCurrentTab} setAutoGenerateItem={setAutoGenerateItem} setLoadingState={setLoadingState} />;
     }
   };
 
   return (
     <View style={styles.container}>
       {renderTab()}
+      
+      {loadingState.isLoading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingModal}>
+            <ActivityIndicator size="large" color="#6ee7b7" />
+            <Text style={styles.loadingText}>{loadingState.message}</Text>
+            {loadingState.submessage && (
+              <Text style={styles.loadingSubtext}>{loadingState.submessage}</Text>
+            )}
+          </View>
+        </View>
+      )}
       
       <View style={styles.tabBar}>
         <TouchableOpacity
@@ -154,9 +175,11 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 interface WardrobeTabProps {
   loadStats: () => Promise<void>;
   setCurrentTab: (tab: Tab) => void;
+  setAutoGenerateItem: (item: {type: string, id: string} | null) => void;
+  setLoadingState: (state: LoadingState) => void;
 }
 
-const WardrobeTab: React.FC<WardrobeTabProps> = ({ loadStats, setCurrentTab }) => {
+const WardrobeTab: React.FC<WardrobeTabProps> = ({ loadStats, setCurrentTab, setAutoGenerateItem, setLoadingState }) => {
   const [category, setCategory] = useState<string>('all');
   const [items, setItems] = useState<WardrobeItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -221,61 +244,86 @@ const WardrobeTab: React.FC<WardrobeTabProps> = ({ loadStats, setCurrentTab }) =
   };
 
   const deleteItem = async () => {
+    if (!selectedItem) {
+      console.log('No item selected');
+      return;
+    }
+    
+    console.log('Attempting to delete:', selectedItem.clothing_id);
+    
+    if (typeof window !== 'undefined' && window.confirm) {
+      const confirmed = window.confirm(`Are you sure you want to delete ${selectedItem.clothing_id}?`);
+      if (confirmed) {
+        await performDelete();
+      }
+    } else {
+      Alert.alert(
+        'Delete item',
+        `Are you sure you want to delete ${selectedItem.clothing_id}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              await performDelete();
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  const performDelete = async () => {
     if (!selectedItem) return;
     
-    Alert.alert(
-      'Delete item',
-      `Are you sure you want to delete this item?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await fetch(`${API_BASE}/wardrobe/items/${selectedItem.clothing_id}`, {
-                method: 'DELETE',
-              });
-              
-              if (response.ok) {
-                Alert.alert('Success', 'Item deleted');
-                closeItemModal();
-                loadItems();
-                loadStats();
-              } else {
-                Alert.alert('Error', 'Failed to delete item');
-              }
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete item');
-            }
-          },
-        },
-      ]
-    );
+    closeItemModal();
+    setLoadingState({ isLoading: true, message: 'Deleting item...', submessage: 'Please wait' });
+    
+    try {
+      console.log('Making DELETE request to:', `${API_BASE}/wardrobe/items/${selectedItem.clothing_id}`);
+      
+      const response = await fetch(`${API_BASE}/wardrobe/items/${selectedItem.clothing_id}`, {
+        method: 'DELETE',
+      });
+      
+      console.log('Delete response status:', response.status);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Delete successful:', result);
+        await loadItems();
+        await loadStats();
+        setLoadingState({ isLoading: false, message: '' });
+        Alert.alert('Success', 'Item deleted successfully');
+      } else {
+        const errorText = await response.text();
+        console.error('Delete failed:', response.status, errorText);
+        setLoadingState({ isLoading: false, message: '' });
+        try {
+          const error = JSON.parse(errorText);
+          Alert.alert('Error', error.detail || 'Failed to delete item');
+        } catch {
+          Alert.alert('Error', `Failed to delete item (${response.status})`);
+        }
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      setLoadingState({ isLoading: false, message: '' });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Network error: ${errorMessage}`);
+    }
   };
 
   const createOutfitWithItem = async () => {
     if (!selectedItem) return;
     
-    try {
-      const response = await fetch(`${API_BASE}/outfits/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          item_type: selectedItem.item_type,
-          item_id: selectedItem.clothing_id,
-        }),
-      });
-      
-      if (response.ok) {
-        closeItemModal();
-        setCurrentTab('outfits');
-      } else {
-        Alert.alert('Error', 'Failed to generate outfit');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to generate outfit');
-    }
+    closeItemModal();
+    setAutoGenerateItem({
+      type: selectedItem.item_type,
+      id: selectedItem.clothing_id
+    });
+    setCurrentTab('outfits');
   };
 
   const pickImage = async (source: 'camera' | 'gallery'): Promise<void> => {
@@ -298,13 +346,13 @@ const WardrobeTab: React.FC<WardrobeTabProps> = ({ loadStats, setCurrentTab }) =
 
       const result = source === 'camera' 
         ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [3, 4],
             quality: 0.8,
           })
         : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [3, 4],
             quality: 0.8,
@@ -319,42 +367,49 @@ const WardrobeTab: React.FC<WardrobeTabProps> = ({ loadStats, setCurrentTab }) =
   };
 
   const uploadImage = async (imageUri: string): Promise<void> => {
-    setUploadStep('uploading');
+    setAddModalVisible(false);
+    setLoadingState({ isLoading: true, message: 'Uploading...', submessage: 'Please wait' });
     
     try {
       const formData = new FormData();
-      const filename = imageUri.split('/').pop() || 'image.jpg';
-      
-      formData.append('file', {
-        uri: imageUri,
-        name: filename,
-        type: 'image/jpeg',
-      } as any);
 
-      const response = await fetch(`${API_BASE}/wardrobe/items?item_type=${uploadCategory}`, {
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      const file = new File([blob], `upload.jpg`, { type: blob.type || 'image/jpeg' });
+      formData.append('file', file);
+
+      console.log('Uploading to:', `${API_BASE}/wardrobe/items?item_type=${uploadCategory}`);
+
+      const uploadResponse = await fetch(`${API_BASE}/wardrobe/items?item_type=${uploadCategory}`, {
         method: 'POST',
         body: formData,
-        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      if (response.ok) {
-        setUploadStep('processing');
-        
-        setTimeout(() => {
-          setUploadStep('complete');
-          setTimeout(() => {
-            setAddModalVisible(false);
-            setUploadStep('initial');
-            loadItems();
-            loadStats();
-          }, 1500);
+      console.log('Upload response status:', uploadResponse.status);
+
+      if (uploadResponse.ok) {
+        const result = await uploadResponse.json();
+        console.log('Upload success:', result);
+        setLoadingState({ isLoading: true, message: 'Processing...', submessage: 'Extracting features' });
+
+        setTimeout(async () => {
+          await loadItems();
+          await loadStats();
+          setLoadingState({ isLoading: false, message: '' });
+          setUploadStep('initial');
         }, 2000);
       } else {
-        Alert.alert('Upload failed', 'Failed to upload image');
+        const errorText = await uploadResponse.text();
+        console.error('Upload failed:', uploadResponse.status, errorText);
+        setLoadingState({ isLoading: false, message: '' });
+        Alert.alert('Upload failed', errorText || 'Failed to upload image');
         setUploadStep('initial');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to upload');
+      console.error('Upload error:', error);
+      setLoadingState({ isLoading: false, message: '' });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Failed to upload: ${errorMessage}`);
       setUploadStep('initial');
     }
   };
@@ -393,10 +448,13 @@ const WardrobeTab: React.FC<WardrobeTabProps> = ({ loadStats, setCurrentTab }) =
       ) : (
         <ScrollView style={styles.itemsScroll}>
           <View style={styles.itemsGrid}>
-            {items.map((item) => (
+            {items.map((item, index) => (
               <TouchableOpacity
                 key={item.id}
-                style={styles.itemCard}
+                style={[
+                  styles.itemCard,
+                  (index + 1) % 3 === 0 && { marginRight: 0 }
+                ]}
                 onPress={() => openItemModal(item)}
               >
                 <Image 
@@ -439,6 +497,15 @@ const WardrobeTab: React.FC<WardrobeTabProps> = ({ loadStats, setCurrentTab }) =
                       <Text style={styles.descriptionHeader}>Description</Text>
                       
                       <View style={styles.featuresList}>
+                        {itemFeatures.uploaded_at && (
+                          <View style={styles.featureRow}>
+                            <Text style={styles.featureLabel}>Date added</Text>
+                            <Text style={styles.featureValue}>
+                              {new Date(itemFeatures.uploaded_at).toLocaleDateString()}
+                            </Text>
+                          </View>
+                        )}
+                        
                         {itemFeatures.dominant_color && (
                           <View style={styles.featureRow}>
                             <Text style={styles.featureLabel}>Dominant color</Text>
@@ -517,55 +584,37 @@ const WardrobeTab: React.FC<WardrobeTabProps> = ({ loadStats, setCurrentTab }) =
       >
         <View style={styles.modalOverlay}>
           <View style={styles.addModal}>
-            {uploadStep === 'initial' ? (
-              <>
-                <Text style={styles.addModalTitle}>Add item</Text>
-                
-                <Text style={styles.addModalLabel}>Select category</Text>
-                <View style={styles.categoryButtons}>
-                  {['shirt', 'pants', 'shoes'].map((cat) => (
-                    <TouchableOpacity
-                      key={cat}
-                      style={[styles.categoryButton, uploadCategory === cat && styles.categoryButtonActive]}
-                      onPress={() => setUploadCategory(cat)}
-                    >
-                      <Text style={[styles.categoryButtonText, uploadCategory === cat && styles.categoryButtonTextActive]}>
-                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                
-                <TouchableOpacity style={styles.uploadButton} onPress={() => pickImage('camera')}>
-                  <Text style={styles.uploadButtonText}>Take photo</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.uploadButton} onPress={() => pickImage('gallery')}>
-                  <Text style={styles.uploadButtonText}>Choose from gallery</Text>
-                </TouchableOpacity>
-                
+            <Text style={styles.addModalTitle}>Add item</Text>
+            
+            <Text style={styles.addModalLabel}>Select category</Text>
+            <View style={styles.categoryButtons}>
+              {['shirt', 'pants', 'shoes'].map((cat) => (
                 <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => setAddModalVisible(false)}
+                  key={cat}
+                  style={[styles.categoryButton, uploadCategory === cat && styles.categoryButtonActive]}
+                  onPress={() => setUploadCategory(cat)}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={[styles.categoryButtonText, uploadCategory === cat && styles.categoryButtonTextActive]}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </Text>
                 </TouchableOpacity>
-              </>
-            ) : uploadStep === 'uploading' ? (
-              <>
-                <ActivityIndicator size="large" color="#6ee7b7" />
-                <Text style={styles.uploadStatusText}>Uploading...</Text>
-              </>
-            ) : uploadStep === 'processing' ? (
-              <>
-                <ActivityIndicator size="large" color="#6ee7b7" />
-                <Text style={styles.uploadStatusText}>Processing...</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.uploadStatusText}>Complete!</Text>
-              </>
-            )}
+              ))}
+            </View>
+            
+            <TouchableOpacity style={styles.uploadButton} onPress={() => pickImage('camera')}>
+              <Text style={styles.uploadButtonText}>Take photo</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.uploadButton} onPress={() => pickImage('gallery')}>
+              <Text style={styles.uploadButtonText}>Choose from gallery</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setAddModalVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -575,12 +624,15 @@ const WardrobeTab: React.FC<WardrobeTabProps> = ({ loadStats, setCurrentTab }) =
 
 interface OutfitsTabProps {
   loadStats: () => Promise<void>;
+  autoGenerateItem: {type: string, id: string} | null;
+  setAutoGenerateItem: (item: {type: string, id: string} | null) => void;
+  setLoadingState: (state: LoadingState) => void;
 }
 
-const OutfitsTab: React.FC<OutfitsTabProps> = ({ loadStats }) => {
+const OutfitsTab: React.FC<OutfitsTabProps> = ({ loadStats, autoGenerateItem, setAutoGenerateItem, setLoadingState }) => {
   const [currentOutfit, setCurrentOutfit] = useState<Outfit | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const [hasRated, setHasRated] = useState<boolean>(false);
+  const [lastRating, setLastRating] = useState<number | null>(null);
   const [recentRatings, setRecentRatings] = useState<Rating[]>([]);
   const [pickerModalVisible, setPickerModalVisible] = useState<boolean>(false);
   const [pickerItems, setPickerItems] = useState<WardrobeItem[]>([]);
@@ -589,6 +641,13 @@ const OutfitsTab: React.FC<OutfitsTabProps> = ({ loadStats }) => {
   useEffect(() => {
     loadRecentRatings();
   }, []);
+
+  useEffect(() => {
+    if (autoGenerateItem) {
+      generateOutfitWithItem(autoGenerateItem.type, autoGenerateItem.id);
+      setAutoGenerateItem(null);
+    }
+  }, [autoGenerateItem]);
 
   const loadRecentRatings = async () => {
     try {
@@ -602,9 +661,35 @@ const OutfitsTab: React.FC<OutfitsTabProps> = ({ loadStats }) => {
     }
   };
 
+  const generateOutfitWithItem = async (itemType: string, itemId: string) => {
+    setLoading(true);
+    setLastRating(null);
+    
+    try {
+      const response = await fetch(`${API_BASE}/outfits/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          item_type: itemType,
+          item_id: itemId,
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentOutfit(data);
+      } else {
+        Alert.alert('Error', 'Failed to generate outfit');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to generate outfit');
+    }
+    setLoading(false);
+  };
+
   const generateRandomOutfit = async () => {
     setLoading(true);
-    setHasRated(false);
+    setLastRating(null);
     try {
       const response = await fetch(`${API_BASE}/outfits/random`);
       if (response.ok) {
@@ -626,7 +711,10 @@ const OutfitsTab: React.FC<OutfitsTabProps> = ({ loadStats }) => {
         : `${API_BASE}/wardrobe/items?item_type=${pickerCategory}`;
       const response = await fetch(endpoint);
       const data = await response.json();
-      setPickerItems(data);
+      
+      // Randomize the picker items
+      const randomizedData = pickerCategory === 'all' ? shuffleArray(data) : data;
+      setPickerItems(randomizedData);
       setPickerModalVisible(true);
     } catch (error) {
       Alert.alert('Error', 'Failed to load items');
@@ -635,29 +723,7 @@ const OutfitsTab: React.FC<OutfitsTabProps> = ({ loadStats }) => {
 
   const selectItemForOutfit = async (item: WardrobeItem) => {
     setPickerModalVisible(false);
-    setLoading(true);
-    setHasRated(false);
-    
-    try {
-      const response = await fetch(`${API_BASE}/outfits/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          item_type: item.item_type,
-          item_id: item.clothing_id,
-        }),
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setCurrentOutfit(data);
-      } else {
-        Alert.alert('Error', 'Failed to generate outfit');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to generate outfit');
-    }
-    setLoading(false);
+    generateOutfitWithItem(item.item_type, item.clothing_id);
   };
 
   const rateOutfit = async (rating: number) => {
@@ -677,17 +743,21 @@ const OutfitsTab: React.FC<OutfitsTabProps> = ({ loadStats }) => {
       
       if (response.ok) {
         const result = await response.json();
-        setHasRated(true);
+        setLastRating(rating);
         loadStats();
         loadRecentRatings();
         
         if (result.should_retrain) {
           Alert.alert('Rating saved!', `Training new model with ${result.rating_count} ratings...`);
           
+          setLoadingState({ isLoading: true, message: 'Training new model...', submessage: 'Please wait' });
           try {
             await fetch(`${API_BASE}/model/retrain`, { method: 'POST' });
+            await loadStats();
           } catch (error) {
             console.error('Retraining error:', error);
+          } finally {
+            setLoadingState({ isLoading: false, message: '' });
           }
         }
       }
@@ -710,7 +780,7 @@ const OutfitsTab: React.FC<OutfitsTabProps> = ({ loadStats }) => {
             disabled={loading}
           >
             <View style={styles.generateButtonIcon}>
-              <Text style={styles.generateButtonIconText}>R</Text>
+              <Text style={styles.generateButtonIconText}>🔀</Text>
             </View>
             <Text style={styles.generateButtonTextImproved}>Generate random</Text>
           </TouchableOpacity>
@@ -721,7 +791,7 @@ const OutfitsTab: React.FC<OutfitsTabProps> = ({ loadStats }) => {
             disabled={loading}
           >
             <View style={styles.generateButtonIcon}>
-              <Text style={styles.generateButtonIconText}>B</Text>
+              <Text style={styles.generateButtonIconText}>🔨</Text>
             </View>
             <Text style={styles.generateButtonTextImproved}>Build around item</Text>
           </TouchableOpacity>
@@ -730,7 +800,7 @@ const OutfitsTab: React.FC<OutfitsTabProps> = ({ loadStats }) => {
         {loading ? (
           <View style={styles.outfitLoadingContainer}>
             <ActivityIndicator size="large" color="#6ee7b7" />
-            <Text style={styles.loadingText}>Generating outfit...</Text>
+            <Text style={styles.outfitLoadingText}>Generating outfit...</Text>
           </View>
         ) : currentOutfit ? (
           <View style={styles.currentOutfitSection}>
@@ -772,16 +842,16 @@ const OutfitsTab: React.FC<OutfitsTabProps> = ({ loadStats }) => {
                     key={star}
                     style={styles.starButton}
                     onPress={() => rateOutfit(star)}
-                    disabled={hasRated}
+                    disabled={lastRating !== null}
                   >
                     <Text style={styles.starText}>
-                      {hasRated ? '★' : '☆'}
+                      {lastRating !== null && star <= lastRating ? '★' : '☆'}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
               
-              {hasRated && (
+              {lastRating !== null && (
                 <TouchableOpacity
                   style={styles.generateAnotherButton}
                   onPress={generateRandomOutfit}
@@ -794,8 +864,7 @@ const OutfitsTab: React.FC<OutfitsTabProps> = ({ loadStats }) => {
         ) : (
           <View style={styles.emptyOutfitState}>
             <Text style={styles.emptyStateText}>Generate an outfit to get started</Text>
-          </View>
-        )}
+          </View>)}
 
         {recentRatings.length > 0 && (
           <View style={styles.recentSection}>
@@ -868,7 +937,8 @@ const OutfitsTab: React.FC<OutfitsTabProps> = ({ loadStats }) => {
                         : `${API_BASE}/wardrobe/items?item_type=${cat}`;
                       const response = await fetch(endpoint);
                       const data = await response.json();
-                      setPickerItems(data);
+                      const randomizedData = cat === 'all' ? shuffleArray(data) : data;
+                      setPickerItems(randomizedData);
                     }}
                   >
                     <Text style={[styles.filterChipText, pickerCategory === cat && styles.filterChipTextActive]}>
@@ -881,10 +951,13 @@ const OutfitsTab: React.FC<OutfitsTabProps> = ({ loadStats }) => {
             
             <ScrollView style={styles.pickerScroll}>
               <View style={styles.pickerGrid}>
-                {pickerItems.map((item) => (
+                {pickerItems.map((item, index) => (
                   <TouchableOpacity
                     key={item.id}
-                    style={styles.pickerItem}
+                    style={[
+                      styles.pickerItem,
+                      (index + 1) % 3 === 0 && { marginRight: 0 }
+                    ]}
                     onPress={() => selectItemForOutfit(item)}
                   >
                     <Image 
@@ -1043,7 +1116,7 @@ const styles = StyleSheet.create({
   itemsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     paddingBottom: 100,
   },
   itemCard: {
@@ -1052,6 +1125,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
     borderRadius: 12,
     marginBottom: 12,
+    marginRight: '3.5%',
     borderWidth: 1,
     borderColor: '#d1d5db',
     padding: 8,
@@ -1108,21 +1182,26 @@ const styles = StyleSheet.create({
   descriptionSection: {
     paddingHorizontal: 20,
     marginBottom: 20,
+    alignItems: 'center',
   },
   descriptionHeader: {
     fontSize: 18,
     fontWeight: '600',
     color: '#374151',
     marginBottom: 16,
+    textAlign: 'center',
   },
   featuresList: {
     gap: 12,
+    width: '100%',
+    maxWidth: 300,
   },
   featureRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   featureLabel: {
     fontSize: 14,
@@ -1132,6 +1211,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#374151',
+    marginLeft: 16,
   },
   colorSwatch: {
     width: 32,
@@ -1139,6 +1219,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#d1d5db',
+    marginLeft: 16,
   },
   itemModalButtons: {
     flexDirection: 'row',
@@ -1279,9 +1360,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   generateButtonIconText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#047857',
+    fontSize: 24,
   },
   generateButtonTextImproved: {
     fontSize: 14,
@@ -1293,7 +1372,7 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
     alignItems: 'center',
   },
-  loadingText: {
+  outfitLoadingText: {
     fontSize: 14,
     color: '#6b7280',
     marginTop: 12,
@@ -1438,7 +1517,7 @@ const styles = StyleSheet.create({
   pickerGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   pickerItem: {
     width: '31%',
@@ -1446,6 +1525,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
     borderRadius: 12,
     marginBottom: 12,
+    marginRight: '3.5%',
     borderWidth: 1,
     borderColor: '#d1d5db',
     padding: 8,
@@ -1496,6 +1576,37 @@ const styles = StyleSheet.create({
   projectCreditText: {
     fontSize: 24,
     color: '#6b7280',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingModal: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 40,
+    alignItems: 'center',
+    minWidth: 250,
+  },
+  loadingText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  loadingSubtext: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
 

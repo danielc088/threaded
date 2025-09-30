@@ -413,6 +413,7 @@ def get_item_features(clothing_id: str):
             'item_type': item['item_type'],
             'dominant_color': item.get('dominant_color'),
             'secondary_color': item.get('secondary_color'),
+            'uploaded_at': item.get('uploaded_at')
         }
         
         if genai_item:

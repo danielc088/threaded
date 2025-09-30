@@ -347,7 +347,7 @@ def retrain_model():
     """retrain ml model"""
     
     try:
-        from src.recommender.random_forest import train_user_model_from_ratings
+        from src.recommender.random_forest import train_user_model_from_ratings, cleanup_old_models
         
         result = train_user_model_from_ratings(user_id, db, min_ratings=5)
         
@@ -359,6 +359,8 @@ def retrain_model():
             generator = CachedOutfitGenerator(user_id, db)
             generator.invalidate_cache()
             
+            cleanup_old_models(user_id, keep_count=3)
+
             return {
                 "success": True,
                 "message": "model retrained successfully",

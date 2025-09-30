@@ -6,6 +6,8 @@ learns what you like and gets better over time
 
 import pandas as pd
 import numpy as np
+import os
+import glob
 import pickle
 from pathlib import Path
 from sklearn.ensemble import RandomForestClassifier
@@ -338,6 +340,29 @@ def list_user_models():
     
     return sorted(user_models, key=lambda x: x['user_id'])
 
+def cleanup_old_models(user_id: str, keep_count: int = 3):
+    """keep only the most recent N models, delete older ones"""
+    model_dir = Path(f"models/{user_id}")
+    
+    if not model_dir.exists():
+        return
+    
+    # get all model files for this user
+    model_files = glob.glob(str(model_dir / "outfit_model_*.pkl"))
+    
+    if len(model_files) <= keep_count:
+        return
+    
+    # sort by modification time (newest first)
+    model_files.sort(key=os.path.getmtime, reverse=True)
+    
+    # delete old models (keep only the newest 'keep_count' models)
+    for old_model in model_files[keep_count:]:
+        try:
+            os.remove(old_model)
+            print(f"Deleted old model: {old_model}")
+        except Exception as e:
+            print(f"Error deleting {old_model}: {e}")
 
 # keep backward compatibility
 OutfitRecommendationModel = UserOutfitRecommendationModel

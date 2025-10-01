@@ -44,9 +44,17 @@ export const borderRadius = {
 };
 
 export const fontSize = {
-  text: 14,      // Body text, labels, buttons
-  subheading: 18, // Section titles, card headers
-  title: 32,      // Page titles
+  text: 16,      // Body text, labels, buttons
+  subheading: 20, // Section titles, card headers
+  title: 30,      // Page titles
+};
+
+export const fonts = {
+  light: 'NotoSerifGurmukhi-Light',
+  medium: 'NotoSerifGurmukhi-Medium',
+  semiBold: 'NotoSerifGurmukhi-SemiBold',
+  extraBold: 'NotoSerifGurmukhi-ExtraBold',
+  black: 'NotoSerifGurmukhi-Black', 
 };
 
 export const styles = StyleSheet.create({
@@ -63,14 +71,14 @@ export const styles = StyleSheet.create({
   // Header styles
   header: {
     paddingHorizontal: spacing.xl,
-    paddingTop: 60,
+    paddingTop: spacing.xl,
     paddingBottom: spacing.xl,
     backgroundColor: colors.background,
   },
   headerTitle: {
     fontSize: fontSize.title,
-    fontWeight: '600',
-    color: colors.primary,
+    fontFamily: fonts.extraBold,
+    color: colors.primaryDark,
   },
 
   // Tab bar styles
@@ -98,10 +106,11 @@ export const styles = StyleSheet.create({
   },
   tabButtonText: {
     fontSize: fontSize.text,
-    color: colors.textLight,
-    fontWeight: '500',
+    fontFamily: fonts.semiBold,
+    color: colors.textLighter,
   },
   tabButtonTextActive: {
+    fontFamily: fonts.semiBold,
     color: colors.primaryDark,
   },
   
@@ -128,10 +137,11 @@ export const styles = StyleSheet.create({
   },
   filterChipText: {
     fontSize: fontSize.text,
-    fontWeight: '500',
+    fontFamily: fonts.semiBold,
     color: colors.textLight,
   },
   filterChipTextActive: {
+    fontFamily: fonts.semiBold,
     color: colors.primaryDark,
   },
   
@@ -189,13 +199,14 @@ export const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: fontSize.subheading,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: colors.text,
     marginTop: spacing.lg,
     textAlign: 'center',
   },
   loadingSubtext: {
     fontSize: fontSize.text,
+    fontFamily: fonts.semiBold,
     color: colors.textLight,
     marginTop: spacing.sm,
     textAlign: 'center',
@@ -220,8 +231,8 @@ export const styles = StyleSheet.create({
   },
   fabText: {
     fontSize: 32,
+    fontFamily: fonts.semiBold,
     color: colors.primaryDark,
-    fontWeight: '300',
   },
   
   // Modal styles
@@ -252,7 +263,7 @@ export const styles = StyleSheet.create({
   },
   descriptionHeader: {
     fontSize: fontSize.subheading,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: colors.text,
     marginBottom: spacing.lg,
     textAlign: 'center',
@@ -271,11 +282,12 @@ export const styles = StyleSheet.create({
   },
   featureLabel: {
     fontSize: fontSize.text,
+    fontFamily: fonts.semiBold,
     color: colors.textLight,
   },
   featureValue: {
     fontSize: fontSize.text,
-    fontWeight: '500',
+    fontFamily: fonts.semiBold,
     color: colors.text,
     marginLeft: spacing.lg,
   },
@@ -302,7 +314,7 @@ export const styles = StyleSheet.create({
   },
   createOutfitButtonText: {
     fontSize: fontSize.text,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: colors.primaryDark,
   },
   deleteButton: {
@@ -314,7 +326,7 @@ export const styles = StyleSheet.create({
   },
   deleteButtonText: {
     fontSize: fontSize.text,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: colors.error,
   },
   closeModalButton: {
@@ -326,7 +338,7 @@ export const styles = StyleSheet.create({
   },
   closeModalButtonText: {
     fontSize: fontSize.text,
-    fontWeight: '500',
+    fontFamily: fonts.semiBold,
     color: colors.textLight,
   },
   
@@ -340,13 +352,13 @@ export const styles = StyleSheet.create({
   },
   addModalTitle: {
     fontSize: fontSize.subheading,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: colors.text,
     marginBottom: spacing.xl,
   },
   addModalLabel: {
     fontSize: fontSize.text,
-    fontWeight: '500',
+    fontFamily: fonts.semiBold,
     color: colors.textLight,
     marginBottom: spacing.md,
   },
@@ -367,10 +379,11 @@ export const styles = StyleSheet.create({
   },
   categoryButtonText: {
     fontSize: fontSize.text,
-    fontWeight: '500',
+    fontFamily: fonts.semiBold,
     color: colors.textLight,
   },
   categoryButtonTextActive: {
+    fontFamily: fonts.semiBold,
     color: colors.primaryDark,
   },
   uploadButton: {
@@ -382,7 +395,7 @@ export const styles = StyleSheet.create({
   },
   uploadButtonText: {
     fontSize: fontSize.text,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: colors.primaryDark,
   },
   cancelButton: {
@@ -394,7 +407,7 @@ export const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: fontSize.text,
-    fontWeight: '500',
+    fontFamily: fonts.semiBold,
     color: colors.textLight,
   },
   
@@ -427,7 +440,7 @@ export const styles = StyleSheet.create({
   },
   generateButtonTextImproved: {
     fontSize: fontSize.text,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: colors.secondary,
     textAlign: 'center',
   },
@@ -437,6 +450,7 @@ export const styles = StyleSheet.create({
   },
   outfitLoadingText: {
     fontSize: fontSize.text,
+    fontFamily: fonts.semiBold,
     color: colors.textLight,
     marginTop: spacing.md,
   },
@@ -446,7 +460,7 @@ export const styles = StyleSheet.create({
   },
   outfitImages: {
     gap: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xxxl,
   },
   outfitImageContainer: {
     backgroundColor: colors.background,
@@ -454,7 +468,7 @@ export const styles = StyleSheet.create({
     padding: spacing.lg,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#000000',
+    borderColor: colors.border,
   },
   outfitImage: {
     width: 240,
@@ -462,17 +476,18 @@ export const styles = StyleSheet.create({
   },
   matchScore: {
     fontSize: fontSize.subheading,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: colors.primary,
     textAlign: 'center',
     marginBottom: spacing.xxl,
   },
   ratingSection: {
     alignItems: 'center',
+    marginTop: spacing.xxl,
   },
   ratingLabel: {
     fontSize: fontSize.subheading,
-    fontWeight: '500',
+    fontFamily: fonts.semiBold,
     color: colors.text,
     marginBottom: spacing.lg,
   },
@@ -487,10 +502,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   starText: {
-    fontSize: 40,
+    fontSize: 50,
     color: colors.warning,
     marginBottom: spacing.lg,
-
   },
   emptyOutfitState: {
     paddingVertical: 60,
@@ -498,6 +512,7 @@ export const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: fontSize.text,
+    fontFamily: fonts.semiBold,
     color: colors.textLighter,
   },
   
@@ -511,7 +526,7 @@ export const styles = StyleSheet.create({
   },
   recentSectionTitle: {
     fontSize: fontSize.subheading,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: colors.text,
     marginBottom: spacing.lg,
     paddingHorizontal: spacing.xl,
@@ -536,8 +551,6 @@ export const styles = StyleSheet.create({
     padding: spacing.sm,
     alignItems: 'center',
     marginBottom: spacing.sm,
-    //borderWidth: 1,
-    //borderColor: colors.borderDark,
   },
   recentOutfitImage: {
     width: 140,
@@ -549,6 +562,7 @@ export const styles = StyleSheet.create({
   },
   recentRatingStars: {
     fontSize: fontSize.text,
+    fontFamily: fonts.semiBold,
     color: colors.warning,
   },
   
@@ -563,7 +577,7 @@ export const styles = StyleSheet.create({
   },
   pickerModalTitle: {
     fontSize: fontSize.subheading,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: colors.text,
     paddingHorizontal: spacing.xl,
     marginBottom: spacing.lg,
@@ -602,7 +616,7 @@ export const styles = StyleSheet.create({
   },
   closePickerButtonText: {
     fontSize: fontSize.text,
-    fontWeight: '500',
+    fontFamily: fonts.semiBold,
     color: colors.textLight,
   },
   
@@ -621,12 +635,13 @@ export const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: fontSize.text,
+    fontFamily: fonts.semiBold,
     color: colors.textLight,
     marginBottom: spacing.sm,
   },
   statValue: {
     fontSize: fontSize.subheading,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: colors.primary,
   },
   projectCredit: {
@@ -635,6 +650,7 @@ export const styles = StyleSheet.create({
   },
   projectCreditText: {
     fontSize: fontSize.subheading,
+    fontFamily: fonts.semiBold,
     color: colors.textLight,
   },
 });

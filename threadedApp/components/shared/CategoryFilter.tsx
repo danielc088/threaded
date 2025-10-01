@@ -11,10 +11,10 @@ interface CategoryFilterProps {
 
 const getCategoryLabel = (category: ItemCategory): string => {
   const labels: { [key in ItemCategory]: string } = {
-    'all': 'All',
-    'shirt': 'Shirts',
-    'pants': 'Pants',
-    'shoes': 'Shoes'
+    'all': 'all',
+    'shirt': 'shirts',
+    'pants': 'pants',
+    'shoes': 'shoes'
   };
   return labels[category];
 };

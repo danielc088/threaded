@@ -206,7 +206,7 @@ export const WardrobeTab: React.FC<WardrobeTabProps> = ({
   return (
     <View style={styles.tabContent}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Wardrobe</Text>
+        <Text style={styles.headerTitle}>wardrobe</Text>
       </View>
 
       <CategoryFilter 
@@ -265,5 +265,8 @@ export const WardrobeTab: React.FC<WardrobeTabProps> = ({
         onClose={() => setAddModalVisible(false)}
       />
     </View>
+
+      
   );
+
 };

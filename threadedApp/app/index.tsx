@@ -73,7 +73,7 @@ export default function App() {
         onPress={() => setCurrentTab('wardrobe')}
       >
         <Text style={[styles.tabButtonText, currentTab === 'wardrobe' && styles.tabButtonTextActive]}>
-          Wardrobe
+          wardrobe
         </Text>
       </TouchableOpacity>
 
@@ -82,7 +82,7 @@ export default function App() {
         onPress={() => setCurrentTab('outfits')}
       >
         <Text style={[styles.tabButtonText, currentTab === 'outfits' && styles.tabButtonTextActive]}>
-          Outfits
+          outfits
         </Text>
       </TouchableOpacity>
 
@@ -91,7 +91,7 @@ export default function App() {
         onPress={() => setCurrentTab('stats')}
       >
         <Text style={[styles.tabButtonText, currentTab === 'stats' && styles.tabButtonTextActive]}>
-          Stats
+          stats
         </Text>
       </TouchableOpacity>
     </View>

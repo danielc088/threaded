@@ -14,7 +14,7 @@ export const RecentOutfits: React.FC<RecentOutfitsProps> = ({ ratings, onOutfitP
 
   return (
     <View style={styles.recentSection}>
-      <Text style={styles.recentSectionTitle}>Recently rated</Text>
+      <Text style={styles.recentSectionTitle}>recently rated</Text>
       
       <View style={styles.recentCardsContainer}>
         {ratings.map((rating) => (

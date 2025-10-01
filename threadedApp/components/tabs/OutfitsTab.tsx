@@ -165,7 +165,7 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
     <View style={styles.tabContent}>
       <ScrollView>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Outfits</Text>
+          <Text style={styles.headerTitle}>outfits</Text>
         </View>
 
         <View style={styles.generateSection}>
@@ -177,7 +177,7 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
             <View style={styles.generateButtonIcon}>
               <FontAwesome6 name="shuffle" size={24} color="#065f46" />
             </View>
-            <Text style={styles.generateButtonTextImproved}>Generate random</Text>
+            <Text style={styles.generateButtonTextImproved}>generate random outfit</Text>
           </TouchableOpacity>
           
           <TouchableOpacity
@@ -188,21 +188,21 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
             <View style={styles.generateButtonIcon}>
               <FontAwesome6 name="wrench" size={24} color="#065f46" />
             </View>
-            <Text style={styles.generateButtonTextImproved}>Build around item</Text>
+            <Text style={styles.generateButtonTextImproved}>build outfit around item</Text>
           </TouchableOpacity>
         </View>
 
         {loading ? (
           <View style={styles.outfitLoadingContainer}>
             <ActivityIndicator size="large" color="#6ee7b7" />
-            <Text style={styles.outfitLoadingText}>Generating outfit...</Text>
+            <Text style={styles.outfitLoadingText}>generating outfit...</Text>
           </View>
         ) : currentOutfit ? (
           <>
             <OutfitDisplay outfit={currentOutfit} />
 
             <View style={styles.ratingSection}>
-              <Text style={styles.ratingLabel}>Rate this outfit</Text>
+              <Text style={styles.ratingLabel}>rate this outfit</Text>
               <StarRating 
                 rating={lastRating}
                 onRate={handleRateOutfit}
@@ -212,7 +212,7 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
           </>
         ) : (
           <View style={styles.emptyOutfitState}>
-            <Text style={styles.emptyStateText}>Generate an outfit to get started</Text>
+            <Text style={styles.emptyStateText}>generate an outfit to get started...</Text>
           </View>
         )}
 

@@ -16,7 +16,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({ stats }) => {
   return (
     <View style={styles.tabContent}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Stats</Text>
+        <Text style={styles.headerTitle}>stats</Text>
       </View>
       
       <ScrollView style={styles.statsContent}>

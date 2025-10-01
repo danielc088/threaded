@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Animated } from 'react-native';
+import { MaterialCommunityIcons, Ionicons, Feather } from '@expo/vector-icons';
 import { styles } from '../styles/theme';
 import { Stats, Tab, LoadingState } from '../types';
 import { getStats } from '../services/api';
@@ -68,33 +69,54 @@ export default function App() {
       <LoadingOverlay loadingState={loadingState} />
       
       <View style={styles.tabBar}>
-      <TouchableOpacity
-        style={[styles.tabButton, currentTab === 'wardrobe' && styles.tabButtonActive]}
-        onPress={() => setCurrentTab('wardrobe')}
-      >
-        <Text style={[styles.tabButtonText, currentTab === 'wardrobe' && styles.tabButtonTextActive]}>
-          wardrobe
-        </Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, currentTab === 'wardrobe' && styles.tabButtonActive]}
+          onPress={() => setCurrentTab('wardrobe')}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons 
+            name="wardrobe-outline" 
+            size={20} 
+            color={currentTab === 'wardrobe' ? '#065f46' : '#9ca3af'} 
+            style={styles.tabButtonIcon}
+          />
+          <Text style={[styles.tabButtonText, currentTab === 'wardrobe' && styles.tabButtonTextActive]}>
+            wardrobe
+          </Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.tabButton, currentTab === 'outfits' && styles.tabButtonActive]}
-        onPress={() => setCurrentTab('outfits')}
-      >
-        <Text style={[styles.tabButtonText, currentTab === 'outfits' && styles.tabButtonTextActive]}>
-          outfits
-        </Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, currentTab === 'outfits' && styles.tabButtonActive]}
+          onPress={() => setCurrentTab('outfits')}
+          activeOpacity={0.7}
+        >
+          <Ionicons 
+            name="shirt-outline" 
+            size={20} 
+            color={currentTab === 'outfits' ? '#065f46' : '#9ca3af'} 
+            style={styles.tabButtonIcon}
+          />
+          <Text style={[styles.tabButtonText, currentTab === 'outfits' && styles.tabButtonTextActive]}>
+            outfits
+          </Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.tabButton, currentTab === 'stats' && styles.tabButtonActive]}
-        onPress={() => setCurrentTab('stats')}
-      >
-        <Text style={[styles.tabButtonText, currentTab === 'stats' && styles.tabButtonTextActive]}>
-          stats
-        </Text>
-      </TouchableOpacity>
-    </View>
+        <TouchableOpacity
+          style={[styles.tabButton, currentTab === 'stats' && styles.tabButtonActive]}
+          onPress={() => setCurrentTab('stats')}
+          activeOpacity={0.7}
+        >
+          <Feather 
+            name="settings" 
+            size={20} 
+            color={currentTab === 'stats' ? '#065f46' : '#9ca3af'} 
+            style={styles.tabButtonIcon}
+          />
+          <Text style={[styles.tabButtonText, currentTab === 'stats' && styles.tabButtonTextActive]}>
+            stats
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }

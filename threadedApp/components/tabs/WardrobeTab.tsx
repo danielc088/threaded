@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { styles } from '../../styles/theme';
+import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { styles, spacing } from '../../styles/theme';
 import { WardrobeItem, ItemFeatures, ItemCategory, Tab, LoadingState } from '../../types';
 import { getWardrobeItems, deleteWardrobeItem, addWardrobeItem, getItemFeatures } from '../../services/api';
 import { ClothingImage } from '../shared/ClothingImage';
 import { CategoryFilter } from '../shared/CategoryFilter';
 import { ItemDetailsModal } from '../modals/ItemDetailsModal';
 import { AddItemModal } from '../modals/AddItemModal';
+import { AnimatedFAB } from '../shared/AnimatedFAB';
 
 interface WardrobeTabProps {
   loadStats: () => Promise<void>;
@@ -24,6 +25,14 @@ const shuffleArray = <T,>(array: T[]): T[] => {
   return shuffled;
 };
 
+const getNumColumns = (width: number) => {
+  if (width < 600) return 2;    // Phone/narrow - 2 columns (bigger items)
+  if (width < 900) return 3;    // Tablet/half screen - 3 columns
+  if (width < 1200) return 4;   // Desktop medium - 4 columns
+  if (width < 1600) return 5;   // Desktop large - 5 columns
+  return 6;                      // Very large desktop - 6 columns (smaller items)
+};
+
 export const WardrobeTab: React.FC<WardrobeTabProps> = ({ 
   loadStats, 
   setCurrentTab, 
@@ -38,6 +47,10 @@ export const WardrobeTab: React.FC<WardrobeTabProps> = ({
   const [itemFeatures, setItemFeatures] = useState<ItemFeatures | null>(null);
   const [addModalVisible, setAddModalVisible] = useState<boolean>(false);
   const [uploadCategory, setUploadCategory] = useState<'shirt' | 'pants' | 'shoes'>('shirt');
+  const [containerWidth, setContainerWidth] = useState(0);
+  
+  const windowDimensions = useWindowDimensions();
+  const numColumns = getNumColumns(windowDimensions.width);
 
   useEffect(() => {
     loadItems();
@@ -203,8 +216,18 @@ export const WardrobeTab: React.FC<WardrobeTabProps> = ({
     }
   };
 
+  // Calculate with proper padding
+  const gap = spacing.lg;
+  const containerPadding = spacing.md; // Add some padding back
+  const availableWidth = (containerWidth || windowDimensions.width) - (containerPadding * 2);
+  const totalGapWidth = gap * (numColumns - 1);
+  const itemWidth = (availableWidth - totalGapWidth) / numColumns;
+
   return (
-    <View style={styles.tabContent}>
+    <View 
+      style={styles.tabContent}
+      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+    >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>wardrobe</Text>
       </View>
@@ -220,15 +243,24 @@ export const WardrobeTab: React.FC<WardrobeTabProps> = ({
         </View>
       ) : (
         <ScrollView style={styles.itemsScroll}>
-          <View style={styles.itemsGrid}>
-            {items.map((item, index) => (
+          <View style={[styles.itemsGrid, { 
+            gap: gap, 
+            paddingHorizontal: containerPadding,
+            paddingBottom: 100 
+          }]}>
+            {items.map((item) => (
               <TouchableOpacity
                 key={item.id}
                 style={[
                   styles.itemCard,
-                  (index + 1) % 3 === 0 && { marginRight: 0 }
+                  { 
+                    width: itemWidth,
+                    marginRight: 0,
+                    marginBottom: 0,
+                  }
                 ]}
                 onPress={() => openItemModal(item)}
+                activeOpacity={0.7}
               >
                 <ClothingImage 
                   clothingId={item.clothing_id}
@@ -240,12 +272,7 @@ export const WardrobeTab: React.FC<WardrobeTabProps> = ({
         </ScrollView>
       )}
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setAddModalVisible(true)}
-      >
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+      <AnimatedFAB onPress={() => setAddModalVisible(true)} />
 
       <ItemDetailsModal
         visible={itemModalVisible}
@@ -265,8 +292,5 @@ export const WardrobeTab: React.FC<WardrobeTabProps> = ({
         onClose={() => setAddModalVisible(false)}
       />
     </View>
-
-      
   );
-
 };

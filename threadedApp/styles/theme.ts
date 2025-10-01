@@ -91,7 +91,7 @@ export const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingHorizontal: spacing.xl,
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: spacing.xxxl,
   },
   tabButton: {
     backgroundColor: '#f3f4f6',
@@ -112,6 +112,9 @@ export const styles = StyleSheet.create({
   tabButtonTextActive: {
     fontFamily: fonts.semiBold,
     color: colors.primaryDark,
+  },
+  tabButtonIcon: {
+  marginBottom: 2,
   },
   
   // Filter styles
@@ -157,7 +160,7 @@ export const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   itemCard: {
-    width: '31%',
+    //width: '31%',
     aspectRatio: 0.75,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.md,

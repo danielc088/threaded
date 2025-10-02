@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, useWindowDimensions } from 'react-native';
-import { styles, spacing } from '../../styles/theme';
+import { styles, spacing, colors, borderRadius } from '../../styles/theme';
 import { WardrobeItem, ItemFeatures, ItemCategory, Tab, LoadingState } from '../../types';
 import { getWardrobeItems, deleteWardrobeItem, addWardrobeItem, getItemFeatures } from '../../services/api';
 import { ClothingImage } from '../shared/ClothingImage';
@@ -16,29 +16,27 @@ interface WardrobeTabProps {
   setLoadingState: (state: LoadingState) => void;
 }
 
-const shuffleArray = <T,>(array: T[]): T[] => {
+function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    const temp = shuffled[i];
+    shuffled[i] = shuffled[j];
+    shuffled[j] = temp;
   }
   return shuffled;
-};
+}
 
-const getNumColumns = (width: number) => {
-  if (width < 600) return 2;    // Phone/narrow - 2 columns (bigger items)
-  if (width < 900) return 3;    // Tablet/half screen - 3 columns
-  if (width < 1200) return 4;   // Desktop medium - 4 columns
-  if (width < 1600) return 5;   // Desktop large - 5 columns
-  return 6;                      // Very large desktop - 6 columns (smaller items)
-};
+function getNumColumns(width: number): number {
+  if (width < 600) return 2;
+  if (width < 1200) return 3;
+  if (width < 1600) return 4;
+  return 5;
+}
 
-export const WardrobeTab: React.FC<WardrobeTabProps> = ({ 
-  loadStats, 
-  setCurrentTab, 
-  setAutoGenerateItem, 
-  setLoadingState 
-}) => {
+export const WardrobeTab: React.FC<WardrobeTabProps> = (props) => {
+  const { loadStats, setCurrentTab, setAutoGenerateItem, setLoadingState } = props;
+  
   const [category, setCategory] = useState<ItemCategory>('all');
   const [items, setItems] = useState<WardrobeItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -47,7 +45,7 @@ export const WardrobeTab: React.FC<WardrobeTabProps> = ({
   const [itemFeatures, setItemFeatures] = useState<ItemFeatures | null>(null);
   const [addModalVisible, setAddModalVisible] = useState<boolean>(false);
   const [uploadCategory, setUploadCategory] = useState<'shirt' | 'pants' | 'shoes'>('shirt');
-  const [containerWidth, setContainerWidth] = useState(0);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
   
   const windowDimensions = useWindowDimensions();
   const numColumns = getNumColumns(windowDimensions.width);
@@ -62,7 +60,7 @@ export const WardrobeTab: React.FC<WardrobeTabProps> = ({
     }
   }, [category]);
 
-  const loadItems = async (): Promise<void> => {
+  const loadItems = async () => {
     setLoading(true);
     try {
       const itemType = category === 'all' ? undefined : category;
@@ -101,28 +99,20 @@ export const WardrobeTab: React.FC<WardrobeTabProps> = ({
   const deleteItem = async () => {
     if (!selectedItem) return;
     
-    if (typeof window !== 'undefined' && window.confirm) {
-      const confirmed = window.confirm(`Are you sure you want to delete ${selectedItem.clothing_id}?`);
-      if (!confirmed) return;
-    } else {
-      Alert.alert(
-        'Delete item',
-        `Are you sure you want to delete ${selectedItem.clothing_id}?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: async () => {
-              await performDelete();
-            },
+    Alert.alert(
+      'Delete item',
+      'Are you sure you want to delete ' + selectedItem.clothing_id + '?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await performDelete();
           },
-        ]
-      );
-      return;
-    }
-    
-    await performDelete();
+        },
+      ]
+    );
   };
 
   const performDelete = async () => {
@@ -155,19 +145,19 @@ export const WardrobeTab: React.FC<WardrobeTabProps> = ({
     setCurrentTab('outfits');
   };
 
-  const pickImage = async (source: 'camera' | 'gallery'): Promise<void> => {
+  const pickImage = async (source: 'camera' | 'gallery') => {
     try {
       const ImagePicker = await import('expo-image-picker');
       
       if (source === 'camera') {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
+        const result = await ImagePicker.requestCameraPermissionsAsync();
+        if (result.status !== 'granted') {
           Alert.alert('Permission needed', 'Camera permission is required');
           return;
         }
       } else {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
+        const result = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (result.status !== 'granted') {
           Alert.alert('Permission needed', 'Gallery permission is required');
           return;
         }
@@ -195,7 +185,7 @@ export const WardrobeTab: React.FC<WardrobeTabProps> = ({
     }
   };
 
-  const uploadImage = async (imageUri: string): Promise<void> => {
+  const uploadImage = async (imageUri: string) => {
     setAddModalVisible(false);
     setLoadingState({ isLoading: true, message: 'Uploading...', submessage: 'Please wait' });
     
@@ -216,12 +206,19 @@ export const WardrobeTab: React.FC<WardrobeTabProps> = ({
     }
   };
 
-  // Calculate with proper padding
-  const gap = spacing.lg;
-  const containerPadding = spacing.md; // Add some padding back
-  const availableWidth = (containerWidth || windowDimensions.width) - (containerPadding * 2);
+  const gap = 16;
+  const sidePadding = 20;
+  const itemBorderWidth = 2;
+  const itemPaddingTotal = 16;
+  const itemExtraSpace = itemBorderWidth + itemPaddingTotal;
+  
+  const screenWidth = containerWidth || windowDimensions.width;
+  const availableWidth = screenWidth - (sidePadding * 2);
   const totalGapWidth = gap * (numColumns - 1);
-  const itemWidth = (availableWidth - totalGapWidth) / numColumns;
+  const totalExtraSpace = itemExtraSpace * numColumns;
+  
+  const itemWidth = Math.ceil((availableWidth - totalGapWidth - totalExtraSpace) / numColumns) * 1.03;
+  const itemHeight = Math.floor(itemWidth * 1.33);
 
   return (
     <View 
@@ -242,32 +239,43 @@ export const WardrobeTab: React.FC<WardrobeTabProps> = ({
           <ActivityIndicator size="large" color="#6ee7b7" />
         </View>
       ) : (
-        <ScrollView style={styles.itemsScroll}>
-          <View style={[styles.itemsGrid, { 
-            gap: gap, 
-            paddingHorizontal: containerPadding,
-            paddingBottom: 100 
-          }]}>
-            {items.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.itemCard,
-                  { 
+        <ScrollView style={{ flex: 1 }}>
+          <View style={{ 
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            paddingLeft: sidePadding,
+            paddingRight: sidePadding,
+            paddingBottom: 100,
+          }}>
+            {items.map((item, index) => {
+              const isLastInRow = (index + 1) % numColumns === 0;
+              const isLastItem = index === items.length - 1;
+              const marginRight = (isLastInRow || isLastItem) ? 0 : gap;
+              
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={{ 
                     width: itemWidth,
-                    marginRight: 0,
-                    marginBottom: 0,
-                  }
-                ]}
-                onPress={() => openItemModal(item)}
-                activeOpacity={0.7}
-              >
-                <ClothingImage 
-                  clothingId={item.clothing_id}
-                  style={styles.itemImage}
-                />
-              </TouchableOpacity>
-            ))}
+                    height: itemHeight,
+                    marginRight: marginRight,
+                    marginBottom: gap,
+                    backgroundColor: '#f9fafb',
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: '#d1d5db',
+                    padding: 8,
+                  }}
+                  onPress={() => openItemModal(item)}
+                  activeOpacity={0.7}
+                >
+                  <ClothingImage 
+                    clothingId={item.clothing_id}
+                    style={styles.itemImage}
+                  />
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </ScrollView>
       )}

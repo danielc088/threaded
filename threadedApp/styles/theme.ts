@@ -151,7 +151,7 @@ export const styles = StyleSheet.create({
   // Item grid styles
   itemsScroll: {
     flex: 1,
-    paddingHorizontal: spacing.xl,
+    //paddingHorizontal: spacing.xl,
   },
   itemsGrid: {
     flexDirection: 'row',
@@ -161,11 +161,8 @@ export const styles = StyleSheet.create({
   },
   itemCard: {
     //width: '31%',
-    aspectRatio: 0.75,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
-    marginBottom: spacing.md,
-    marginRight: '3.5%',
     borderWidth: 1,
     borderColor: colors.borderDark,
     padding: spacing.sm,

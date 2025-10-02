@@ -94,6 +94,11 @@ class OutfitRequest(BaseModel):
     item_type: str
     item_id: str
 
+class MultiItemOutfitRequest(BaseModel):
+    shirt_id: Optional[str] = None
+    pants_id: Optional[str] = None
+    shoes_id: Optional[str] = None
+
 # === api endpoints ===
 
 @app.get("/")
@@ -307,6 +312,44 @@ def complete_outfit(request: OutfitRequest):
             return outfit
         else:
             raise HTTPException(status_code=404, detail="no outfit could be generated with that item")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/outfits/build")
+def build_outfit(request: MultiItemOutfitRequest):
+    """generate outfit with 0, 1, 2, or 3 items pre-selected"""
+    
+    try:
+        generator = CachedOutfitGenerator(user_id, db)
+        
+        # Count how many items were provided
+        fixed_items = {
+            'shirt': request.shirt_id,
+            'pants': request.pants_id,
+            'shoes': request.shoes_id
+        }
+        
+        num_fixed = sum(1 for v in fixed_items.values() if v is not None)
+        
+        if num_fixed == 0:
+            # No items selected - generate random outfit
+            outfit = generator.get_random_outfit()
+        elif num_fixed == 3:
+            # All items selected - just return them with a score
+            outfit = generator.score_specific_outfit(
+                request.shirt_id,
+                request.pants_id,
+                request.shoes_id
+            )
+        else:
+            # 1 or 2 items selected - complete the outfit
+            outfit = generator.build_partial_outfit(fixed_items)
+        
+        if outfit:
+            return outfit
+        else:
+            raise HTTPException(status_code=404, detail="no outfit could be generated")
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

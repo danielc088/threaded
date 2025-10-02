@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { styles } from '../../styles/theme';
-import { Outfit, Rating, WardrobeItem, ItemCategory, LoadingState } from '../../types';
-import { getRandomOutfit, completeOutfit, rateOutfit, getRatings, getWardrobeItems, retrainModel } from '../../services/api';
+import { Outfit, Rating, WardrobeItem, ItemCategory, LoadingState, SelectedItems, BuildOutfitRequest } from '../../types';
+import { getRandomOutfit, buildOutfit, rateOutfit, getRatings, getWardrobeItems, retrainModel } from '../../services/api';
 import { OutfitDisplay } from '../outfit/OutfitDisplay';
+import { OutfitBuilder } from '../outfit/OutfitBuilder';
 import { RecentOutfits } from '../outfit/RecentOutfits';
 import { StarRating } from '../shared/StarRating';
 import { ItemPickerModal } from '../modals/ItemPickerModal';
@@ -38,6 +39,12 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
   const [pickerModalVisible, setPickerModalVisible] = useState<boolean>(false);
   const [pickerItems, setPickerItems] = useState<WardrobeItem[]>([]);
   const [pickerCategory, setPickerCategory] = useState<ItemCategory>('all');
+  const [currentPickerSlot, setCurrentPickerSlot] = useState<'shirt' | 'pants' | 'shoes' | null>(null);
+  const [selectedItems, setSelectedItems] = useState<SelectedItems>({
+    shirt: null,
+    pants: null,
+    shoes: null,
+  });
 
   useEffect(() => {
     loadRecentRatings();
@@ -45,7 +52,14 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
 
   useEffect(() => {
     if (autoGenerateItem) {
-      generateOutfitWithItem(autoGenerateItem.type as 'shirt' | 'pants' | 'shoes', autoGenerateItem.id);
+      const itemType = autoGenerateItem.type as 'shirt' | 'pants' | 'shoes';
+      setSelectedItems({
+        shirt: null,
+        pants: null,
+        shoes: null,
+        [itemType]: autoGenerateItem.id,
+      });
+      generateOutfitFromBuilder({ [itemType]: autoGenerateItem.id });
       setAutoGenerateItem(null);
     }
   }, [autoGenerateItem]);
@@ -59,15 +73,31 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
     }
   };
 
-  const generateOutfitWithItem = async (itemType: 'shirt' | 'pants' | 'shoes', itemId: string) => {
+  const generateOutfitFromBuilder = async (items: Partial<SelectedItems> = selectedItems) => {
     setLoading(true);
     setLastRating(null);
     
     try {
-      const data = await completeOutfit({ item_type: itemType, item_id: itemId });
+      const request: BuildOutfitRequest = {
+        shirt_id: items.shirt || undefined,
+        pants_id: items.pants || undefined,
+        shoes_id: items.shoes || undefined,
+      };
+      
+      console.log('Generating outfit with:', request);
+      
+      const data = await buildOutfit(request);
       setCurrentOutfit(data);
+      
+      // Update selected items to show what was generated
+      setSelectedItems({
+        shirt: data.shirt,
+        pants: data.pants,
+        shoes: data.shoes,
+      });
     } catch (error) {
       Alert.alert('Error', 'Failed to generate outfit');
+      console.error('Generate outfit error:', error);
     }
     setLoading(false);
   };
@@ -75,31 +105,73 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
   const generateRandomOutfit = async () => {
     setLoading(true);
     setLastRating(null);
+    
     try {
       const data = await getRandomOutfit();
       setCurrentOutfit(data);
+      
+      // Update selected items to show what was generated
+      setSelectedItems({
+        shirt: data.shirt,
+        pants: data.pants,
+        shoes: data.shoes,
+      });
     } catch (error) {
       Alert.alert('Error', 'No outfit could be generated');
+      console.error('Random outfit error:', error);
     }
     setLoading(false);
   };
 
-  const openItemPicker = async () => {
+  const openItemPicker = (slot: 'shirt' | 'pants' | 'shoes') => {
+    setCurrentPickerSlot(slot);
+    
+    // Set picker category to match the slot
+    setPickerCategory(slot);
+    
+    // Load items ONLY for that specific category
+    loadPickerItems(slot);
+    setPickerModalVisible(true);
+  };
+
+  const loadPickerItems = async (category: ItemCategory) => {
     try {
-      const itemType = pickerCategory === 'all' ? undefined : pickerCategory;
+      // Only load items for the specific category (never 'all')
+      const itemType = category === 'all' ? undefined : category;
       const data = await getWardrobeItems(itemType);
       
-      const randomizedData = pickerCategory === 'all' ? shuffleArray(data) : data;
-      setPickerItems(randomizedData);
-      setPickerModalVisible(true);
+      // No need to randomize since we're filtering by type
+      setPickerItems(data);
     } catch (error) {
       Alert.alert('Error', 'Failed to load items');
+      console.error('Load picker items error:', error);
     }
   };
 
-  const selectItemForOutfit = async (item: WardrobeItem) => {
+  const selectItemForSlot = (item: WardrobeItem) => {
+    if (!currentPickerSlot) return;
+    
     setPickerModalVisible(false);
-    generateOutfitWithItem(item.item_type as 'shirt' | 'pants' | 'shoes', item.clothing_id);
+    setSelectedItems(prev => ({
+      ...prev,
+      [currentPickerSlot]: item.clothing_id,
+    }));
+    setCurrentPickerSlot(null);
+    
+    // Clear current outfit when user changes selection
+    setCurrentOutfit(null);
+    setLastRating(null);
+  };
+
+  const clearItemSlot = (slot: 'shirt' | 'pants' | 'shoes') => {
+    setSelectedItems(prev => ({
+      ...prev,
+      [slot]: null,
+    }));
+    
+    // If we had a current outfit, clear it
+    setCurrentOutfit(null);
+    setLastRating(null);
   };
 
   const handleRateOutfit = async (rating: number) => {
@@ -114,6 +186,14 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
       });
       
       setLastRating(rating);
+      
+      // After rating, reset the builder so user can build another
+      setTimeout(() => {
+        setSelectedItems({ shirt: null, pants: null, shoes: null });
+        setCurrentOutfit(null);
+        setLastRating(null);
+      }, 1500);
+      
       loadStats();
       loadRecentRatings();
       
@@ -132,32 +212,25 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to save rating');
-    }
-  };
-
-  const handlePickerCategoryChange = async (newCategory: ItemCategory) => {
-    setPickerCategory(newCategory);
-    try {
-      const itemType = newCategory === 'all' ? undefined : newCategory;
-      const data = await getWardrobeItems(itemType);
-      const randomizedData = newCategory === 'all' ? shuffleArray(data) : data;
-      setPickerItems(randomizedData);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load items');
+      console.error('Rate outfit error:', error);
     }
   };
 
   const handleRecentOutfitPress = (rating: Rating) => {
-    // Convert the rating back to an outfit format
     const outfit: Outfit = {
       shirt: rating.shirt_id,
       pants: rating.pants_id,
       shoes: rating.shoes_id,
-      score: rating.rating / 5, // Convert 1-5 rating to 0-1 score
+      score: rating.rating / 5,
       score_source: `user_rating_${rating.rating}` as any,
     };
     
     setCurrentOutfit(outfit);
+    setSelectedItems({
+      shirt: rating.shirt_id,
+      pants: rating.pants_id,
+      shoes: rating.shoes_id,
+    });
     setLastRating(rating.rating);
   };
 
@@ -179,18 +252,15 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
             </View>
             <Text style={styles.generateButtonTextImproved}>generate random outfit</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.generateButtonImproved}
-            onPress={openItemPicker}
-            disabled={loading}
-          >
-            <View style={styles.generateButtonIcon}>
-              <FontAwesome6 name="wrench" size={24} color="#065f46" />
-            </View>
-            <Text style={styles.generateButtonTextImproved}>build outfit around item</Text>
-          </TouchableOpacity>
         </View>
+
+        <OutfitBuilder
+          selectedItems={selectedItems}
+          onSelectItem={openItemPicker}
+          onClearItem={clearItemSlot}
+          onGenerate={() => generateOutfitFromBuilder()}
+          loading={loading}
+        />
 
         {loading ? (
           <View style={styles.outfitLoadingContainer}>
@@ -199,8 +269,6 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
           </View>
         ) : currentOutfit ? (
           <>
-            <OutfitDisplay outfit={currentOutfit} />
-
             <View style={styles.ratingSection}>
               <Text style={styles.ratingLabel}>rate this outfit</Text>
               <StarRating 
@@ -210,11 +278,7 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
               />
             </View>
           </>
-        ) : (
-          <View style={styles.emptyOutfitState}>
-            <Text style={styles.emptyStateText}>generate an outfit to get started...</Text>
-          </View>
-        )}
+        ) : null}
 
         <RecentOutfits 
           ratings={recentRatings}
@@ -226,9 +290,11 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
         visible={pickerModalVisible}
         items={pickerItems}
         category={pickerCategory}
-        onCategoryChange={handlePickerCategoryChange}
-        onSelectItem={selectItemForOutfit}
-        onClose={() => setPickerModalVisible(false)}
+        onSelectItem={selectItemForSlot}
+        onClose={() => {
+          setPickerModalVisible(false);
+          setCurrentPickerSlot(null);
+        }}
       />
     </View>
   );

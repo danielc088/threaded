@@ -10,7 +10,7 @@ import {
   ModelRetrainResponse,
   AddItemResponse,
   DeleteItemResponse,
-  ApiError as ApiErrorType, // Rename the imported type
+  BuildOutfitRequest,
 } from '../types';
 
 const API_BASE = 'http://localhost:8000';
@@ -108,6 +108,16 @@ export const completeOutfit = async (request: OutfitRequest): Promise<Outfit> =>
   return handleResponse<Outfit>(response);
 };
 
+export const buildOutfit = async (request: BuildOutfitRequest): Promise<Outfit> => {
+  const response = await fetch(`${API_BASE}/outfits/build`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+  
+  return handleResponse<Outfit>(response);
+};
+
 export const rateOutfit = async (request: OutfitRatingRequest): Promise<OutfitRatingResponse> => {
   const response = await fetch(`${API_BASE}/outfits/rate`, {
     method: 'POST',
@@ -152,6 +162,7 @@ export const api = {
   outfits: {
     getRandom: getRandomOutfit,
     complete: completeOutfit,
+    build: buildOutfit,
     rate: rateOutfit,
   },
   model: {

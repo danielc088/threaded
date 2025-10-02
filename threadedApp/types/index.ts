@@ -72,6 +72,12 @@ export interface OutfitRequest {
   item_id: string;
 }
 
+export interface BuildOutfitRequest {
+  shirt_id?: string;
+  pants_id?: string;
+  shoes_id?: string;
+}
+
 export interface OutfitRatingRequest {
   shirt_id: string;
   pants_id: string;
@@ -105,6 +111,12 @@ export interface DeleteItemResponse {
 }
 
 // UI State Types
+export interface SelectedItems {
+  shirt: string | null;
+  pants: string | null;
+  shoes: string | null;
+}
+
 export type Tab = 'wardrobe' | 'outfits' | 'stats';
 
 export type ItemCategory = 'all' | 'shirt' | 'pants' | 'shoes';

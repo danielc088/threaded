@@ -434,6 +434,195 @@ class CachedOutfitGenerator:
         
         return None
 
+    def score_specific_outfit(self, shirt_id: str, pants_id: str, shoes_id: str):
+        """score a specific outfit combination that user selected"""
+        
+        # Check if user already rated this exact outfit
+        existing_rating = self.db.get_outfit_rating(self.user_id, shirt_id, pants_id, shoes_id)
+        
+        if existing_rating:
+            # Return with user's rating
+            return {
+                'shirt': shirt_id,
+                'pants': pants_id,
+                'shoes': shoes_id,
+                'score': existing_rating['rating'] / 5.0,
+                'score_source': f"user_rating_{existing_rating['rating']}"
+            }
+        
+        # Generate predictions to get ML score
+        if self.scored_combinations is None:
+            self.score_all_combinations_cached(use_existing_ratings=True)
+        
+        # Find this specific combination in scored results
+        outfit_hash = f"{shirt_id}_{pants_id}_{shoes_id}"
+        
+        if self.scored_combinations is not None:
+            match = self.scored_combinations[
+                self.scored_combinations['outfit_hash'] == outfit_hash
+            ]
+            
+            if len(match) > 0:
+                row = match.iloc[0]
+                return {
+                    'shirt': shirt_id,
+                    'pants': pants_id,
+                    'shoes': shoes_id,
+                    'score': row['recommendation_score'],
+                    'score_source': row['score_source']
+                }
+        
+        # Fallback: compute score on-demand
+        try:
+            from src.feature_extraction.feature_engineering import OutfitFeatureEngine
+            engine = OutfitFeatureEngine(self.user_id, self.db)
+            
+            # Load transformer if it exists
+            transformer_path = Path(f"models/user_{self.user_id}/feature_transformer.pkl")
+            if transformer_path.exists():
+                engine.load_transformer(str(transformer_path))
+            
+            # Create dataframe for this one outfit
+            outfit_df = pd.DataFrame([{
+                'shirt_id': shirt_id,
+                'pants_id': pants_id,
+                'shoes_id': shoes_id
+            }])
+            
+            # Compute features
+            X = engine.prepare_outfit_features(outfit_df, for_training=False)
+            
+            # Get prediction
+            if self.model and self.model.is_fitted:
+                score = float(self.model.predict_proba(X)[0])
+                return {
+                    'shirt': shirt_id,
+                    'pants': pants_id,
+                    'shoes': shoes_id,
+                    'score': score,
+                    'score_source': 'new_ml'
+                }
+        except Exception as e:
+            print(f"error scoring specific outfit: {e}")
+        
+        # Final fallback: neutral score
+        return {
+            'shirt': shirt_id,
+            'pants': pants_id,
+            'shoes': shoes_id,
+            'score': 0.5,
+            'score_source': 'random'
+        }
+    
+    
+    def build_partial_outfit(self, fixed_items: dict, use_existing_ratings=False, exploration_rate=0.05):
+        """build outfit with 1 or 2 items pre-selected"""
+        import random
+        
+        # Determine which items need to be filled
+        items_to_fill = [k for k, v in fixed_items.items() if v is None]
+        
+        if len(items_to_fill) == 0:
+            # All items provided (shouldn't happen, but handle it)
+            return self.score_specific_outfit(
+                fixed_items['shirt'],
+                fixed_items['pants'],
+                fixed_items['shoes']
+            )
+        
+        # 5% chance for exploration on the items we need to fill
+        if random.random() < exploration_rate:
+            return self._explore_partial_outfit(fixed_items, items_to_fill)
+        
+        # ML-based completion
+        return self._ml_complete_partial_outfit(fixed_items, items_to_fill, use_existing_ratings)
+    
+    
+    def _explore_partial_outfit(self, fixed_items: dict, items_to_fill: list):
+        """randomly fill in missing items for exploration"""
+        if not hasattr(self, 'wardrobe_items') or self.wardrobe_items is None:
+            self.load_wardrobe_items()
+        
+        import random
+        
+        result = fixed_items.copy()
+        
+        for item_type in items_to_fill:
+            available = self.wardrobe_items[item_type]
+            if available:
+                result[item_type] = random.choice(available)
+        
+        return {
+            'shirt': result['shirt'],
+            'pants': result['pants'],
+            'shoes': result['shoes'],
+            'score': 0.5,
+            'score_source': 'exploration_with_fixed' if len(items_to_fill) < 3 else 'exploration_random'
+        }
+    
+    
+    def _ml_complete_partial_outfit(self, fixed_items: dict, items_to_fill: list, use_existing_ratings=False):
+        """use ML to complete outfit with best-scoring items"""
+
+        # Ensure combinations are scored
+        if self.scored_combinations is None:
+            self.score_all_combinations_cached(use_existing_ratings=use_existing_ratings)
+
+        if len(self.scored_combinations) == 0:
+            return self._explore_partial_outfit(fixed_items, items_to_fill)
+
+        # Filter to combinations that include the fixed items
+        filtered = self.scored_combinations.copy()
+
+        for item_type, item_id in fixed_items.items():
+            if item_id is not None:
+                col_name = f"{item_type}_id"
+                filtered = filtered[filtered[col_name] == item_id]
+
+        if len(filtered) == 0:
+            print(f"no combinations found with fixed items: {fixed_items}")
+            return self._explore_partial_outfit(fixed_items, items_to_fill)
+
+        # Get threshold
+        threshold_prob = getattr(self.model, 'threshold', self.score_threshold) if self.model else self.score_threshold
+
+        # Try tier 1: >= threshold (usually 0.45, so rating >= 4)
+        good_matches = filtered[filtered['recommendation_score'] >= threshold_prob]
+
+        if len(good_matches) > 0:
+            # Found high-scoring matches
+            best = good_matches.sample(n=1).iloc[0]
+            print(f"found high-scoring match with score {best['recommendation_score']:.2f}")
+        else:
+            # Try tier 2: 3-4 star range (0.6-0.8 on normalized scale)
+            tier2_matches = filtered[
+                (filtered['recommendation_score'] >= 0.6) & 
+                (filtered['recommendation_score'] < threshold_prob)
+            ]
+
+            if len(tier2_matches) > 0:
+                best = tier2_matches.sample(n=1).iloc[0]
+                print(f"no high matches, using tier 2 match with score {best['recommendation_score']:.2f}")
+            else:
+                # Try tier 3: 1-2 star range (anything below 0.6)
+                tier3_matches = filtered[filtered['recommendation_score'] < 0.6]
+
+                if len(tier3_matches) > 0:
+                    best = tier3_matches.sample(n=1).iloc[0]
+                    print(f"no tier 2 matches, using tier 3 match with score {best['recommendation_score']:.2f}")
+                else:
+                    # Final fallback: just take the best available
+                    best = filtered.nlargest(1, 'recommendation_score').iloc[0]
+                    print(f"using best available with score {best['recommendation_score']:.2f}")
+
+        return {
+            'shirt': best['shirt_id'],
+            'pants': best['pants_id'],
+            'shoes': best['shoes_id'],
+            'score': best['recommendation_score'],
+            'score_source': best['score_source']
+        }
+
 
 # keep backward compatibility
 OutfitGenerator = CachedOutfitGenerator

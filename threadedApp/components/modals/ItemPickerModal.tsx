@@ -3,13 +3,11 @@ import { View, Text, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import { styles } from '../../styles/theme';
 import { WardrobeItem, ItemCategory } from '../../types';
 import { ClothingImage } from '../shared/ClothingImage';
-import { CategoryFilter } from '../shared/CategoryFilter';
 
 interface ItemPickerModalProps {
   visible: boolean;
   items: WardrobeItem[];
   category: ItemCategory;
-  onCategoryChange: (category: ItemCategory) => void;
   onSelectItem: (item: WardrobeItem) => void;
   onClose: () => void;
 }
@@ -18,10 +16,20 @@ export const ItemPickerModal: React.FC<ItemPickerModalProps> = ({
   visible,
   items,
   category,
-  onCategoryChange,
   onSelectItem,
   onClose,
 }) => {
+  // Get category label for display
+  const getCategoryLabel = (cat: ItemCategory): string => {
+    const labels: { [key in ItemCategory]: string } = {
+      'all': 'all',
+      'shirt': 'tops',
+      'pants': 'bottoms',
+      'shoes': 'shoes'
+    };
+    return labels[cat];
+  };
+
   return (
     <Modal
       visible={visible}
@@ -31,12 +39,9 @@ export const ItemPickerModal: React.FC<ItemPickerModalProps> = ({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.pickerModal}>
-          <Text style={styles.pickerModalTitle}>Choose item</Text>
-          
-          <CategoryFilter 
-            category={category}
-            onCategoryChange={onCategoryChange}
-          />
+          <Text style={styles.pickerModalTitle}>
+            choose {getCategoryLabel(category)}
+          </Text>
           
           <ScrollView style={styles.pickerScroll}>
             <View style={styles.pickerGrid}>

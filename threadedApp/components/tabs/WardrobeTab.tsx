@@ -99,20 +99,14 @@ export const WardrobeTab: React.FC<WardrobeTabProps> = (props) => {
   const deleteItem = async () => {
     if (!selectedItem) return;
     
-    Alert.alert(
-      'Delete item',
-      'Are you sure you want to delete ' + selectedItem.clothing_id + '?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            await performDelete();
-          },
-        },
-      ]
+    // Use native confirm for web compatibility
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${selectedItem.clothing_id}?`
     );
+    
+    if (confirmed) {
+      await performDelete();
+    }
   };
 
   const performDelete = async () => {

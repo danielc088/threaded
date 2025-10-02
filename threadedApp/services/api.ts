@@ -76,6 +76,7 @@ export const addWardrobeItem = async (
 };
 
 export const deleteWardrobeItem = async (clothingId: string): Promise<DeleteItemResponse> => {
+  console.log('Deleting item:', clothingId);
   const response = await fetch(`${API_BASE}/wardrobe/items/${clothingId}`, {
     method: 'DELETE',
   });

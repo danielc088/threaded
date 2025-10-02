@@ -471,8 +471,8 @@ export const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   outfitImage: {
-    width: 240,
-    height: 240,
+    width: 300,
+    height: 300,
   },
   matchScore: {
     fontSize: fontSize.subheading,
@@ -553,8 +553,8 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   recentOutfitImage: {
-    width: 140,
-    height: 140,
+    width: 180,
+    height: 180,
   },
   recentOutfitRating: {
     alignItems: 'center',

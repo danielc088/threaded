@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { FontAwesome6 } from '@expo/vector-icons';
-import { styles } from '../../styles/theme';
+import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, StyleSheet } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { styles, colors, spacing, borderRadius, fontSize, fonts } from '../../styles/theme';
 import { Outfit, Rating, WardrobeItem, ItemCategory, LoadingState, SelectedItems, BuildOutfitRequest } from '../../types';
 import { getRandomOutfit, buildOutfit, rateOutfit, getRatings, getWardrobeItems, retrainModel } from '../../services/api';
 import { OutfitDisplay } from '../outfit/OutfitDisplay';
-import { OutfitBuilder } from '../outfit/OutfitBuilder';
 import { RecentOutfits } from '../outfit/RecentOutfits';
 import { StarRating } from '../shared/StarRating';
 import { ItemPickerModal } from '../modals/ItemPickerModal';
+import { ClothingImage } from '../shared/ClothingImage';
 
 interface OutfitsTabProps {
   loadStats: () => Promise<void>;
@@ -59,7 +59,6 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
         shoes: null,
         [itemType]: autoGenerateItem.id,
       });
-      generateOutfitFromBuilder({ [itemType]: autoGenerateItem.id });
       setAutoGenerateItem(null);
     }
   }, [autoGenerateItem]);
@@ -89,7 +88,6 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
       const data = await buildOutfit(request);
       setCurrentOutfit(data);
       
-      // Update selected items to show what was generated
       setSelectedItems({
         shirt: data.shirt,
         pants: data.pants,
@@ -102,45 +100,17 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
     setLoading(false);
   };
 
-  const generateRandomOutfit = async () => {
-    setLoading(true);
-    setLastRating(null);
-    
-    try {
-      const data = await getRandomOutfit();
-      setCurrentOutfit(data);
-      
-      // Update selected items to show what was generated
-      setSelectedItems({
-        shirt: data.shirt,
-        pants: data.pants,
-        shoes: data.shoes,
-      });
-    } catch (error) {
-      Alert.alert('Error', 'No outfit could be generated');
-      console.error('Random outfit error:', error);
-    }
-    setLoading(false);
-  };
-
   const openItemPicker = (slot: 'shirt' | 'pants' | 'shoes') => {
     setCurrentPickerSlot(slot);
-    
-    // Set picker category to match the slot
     setPickerCategory(slot);
-    
-    // Load items ONLY for that specific category
     loadPickerItems(slot);
     setPickerModalVisible(true);
   };
 
   const loadPickerItems = async (category: ItemCategory) => {
     try {
-      // Only load items for the specific category (never 'all')
       const itemType = category === 'all' ? undefined : category;
       const data = await getWardrobeItems(itemType);
-      
-      // No need to randomize since we're filtering by type
       setPickerItems(data);
     } catch (error) {
       Alert.alert('Error', 'Failed to load items');
@@ -152,15 +122,21 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
     if (!currentPickerSlot) return;
     
     setPickerModalVisible(false);
-    setSelectedItems(prev => ({
-      ...prev,
+    const newSelectedItems = {
+      ...selectedItems,
       [currentPickerSlot]: item.clothing_id,
-    }));
+    };
+    setSelectedItems(newSelectedItems);
     setCurrentPickerSlot(null);
     
-    // Clear current outfit when user changes selection
-    setCurrentOutfit(null);
-    setLastRating(null);
+    // Check if all three items are now selected
+    if (newSelectedItems.shirt && newSelectedItems.pants && newSelectedItems.shoes) {
+      // Auto-generate the outfit to get scoring
+      generateOutfitFromBuilder(newSelectedItems);
+    } else {
+      setCurrentOutfit(null);
+      setLastRating(null);
+    }
   };
 
   const clearItemSlot = (slot: 'shirt' | 'pants' | 'shoes') => {
@@ -169,7 +145,6 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
       [slot]: null,
     }));
     
-    // If we had a current outfit, clear it
     setCurrentOutfit(null);
     setLastRating(null);
   };
@@ -187,7 +162,6 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
       
       setLastRating(rating);
       
-      // After rating, reset the builder so user can build another
       setTimeout(() => {
         setSelectedItems({ shirt: null, pants: null, shoes: null });
         setCurrentOutfit(null);
@@ -234,6 +208,12 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
     setLastRating(rating.rating);
   };
 
+  const categories: Array<{ type: 'shirt' | 'pants' | 'shoes'; label: string }> = [
+    { type: 'shirt', label: 'top' },
+    { type: 'pants', label: 'bottom' },
+    { type: 'shoes', label: 'shoes' },
+  ];
+
   return (
     <View style={styles.tabContent}>
       <ScrollView>
@@ -241,26 +221,58 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
           <Text style={styles.headerTitle}>outfits</Text>
         </View>
 
-        <View style={styles.generateSection}>
+        {/* Top Fill Button */}
+        <View style={localStyles.topButtonContainer}>
           <TouchableOpacity
-            style={styles.generateButtonImproved}
-            onPress={generateRandomOutfit}
+            style={[localStyles.fillButton, loading && localStyles.fillButtonDisabled]}
+            onPress={() => generateOutfitFromBuilder()}
             disabled={loading}
+            activeOpacity={0.7}
           >
-            <View style={styles.generateButtonIcon}>
-              <FontAwesome6 name="shuffle" size={24} color="#065f46" />
-            </View>
-            <Text style={styles.generateButtonTextImproved}>generate random outfit</Text>
+            <MaterialCommunityIcons 
+              name="auto-fix" 
+              size={24} 
+              color="#065f46" 
+              style={localStyles.fillButtonIcon}
+            />
+            <Text style={localStyles.fillButtonText}>
+              {loading ? 'generating...' : 'fill empty slots'}
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <OutfitBuilder
-          selectedItems={selectedItems}
-          onSelectItem={openItemPicker}
-          onClearItem={clearItemSlot}
-          onGenerate={() => generateOutfitFromBuilder()}
-          loading={loading}
-        />
+        {/* Outfit Builder Slots */}
+        <View style={localStyles.builderContainer}>
+          <View style={localStyles.slotsContainer}>
+            {categories.map(({ type, label }) => (
+              <View key={type} style={localStyles.slot}>
+                {selectedItems[type] ? (
+                  <View style={localStyles.selectedItemContainer}>
+                    <ClothingImage
+                      clothingId={selectedItems[type]!}
+                      style={localStyles.selectedItemImage}
+                    />
+                    <TouchableOpacity
+                      style={localStyles.removeButton}
+                      onPress={() => clearItemSlot(type)}
+                    >
+                      <MaterialCommunityIcons name="close-circle" size={24} color={colors.error} />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={localStyles.emptySlot}
+                    onPress={() => openItemPicker(type)}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialCommunityIcons name="hanger" size={40} color={colors.textLighter} />
+                    <Text style={localStyles.emptySlotText}>add {label}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+          </View>
+        </View>
 
         {loading ? (
           <View style={styles.outfitLoadingContainer}>
@@ -299,3 +311,85 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
     </View>
   );
 };
+
+const localStyles = StyleSheet.create({
+  topButtonContainer: {
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.xl,
+  },
+  fillButton: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderDark,
+  },
+  fillButtonDisabled: {
+    opacity: 0.5,
+  },
+  fillButtonIcon: {
+    marginRight: spacing.sm,
+  },
+  fillButtonText: {
+    fontSize: fontSize.text,
+    fontFamily: fonts.semiBold,
+    color: colors.primaryDark,
+  },
+  builderContainer: {
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.xxxl,
+  },
+  slotsContainer: {
+    gap: spacing.md,
+  },
+  slot: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  emptySlot: {
+    height: 180,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.borderDark,
+    borderStyle: 'dashed',
+    borderRadius: borderRadius.md,
+    padding: spacing.xl,
+  },
+  emptySlotText: {
+    fontSize: fontSize.text,
+    fontFamily: fonts.semiBold,
+    color: colors.textLighter,
+    marginTop: spacing.sm,
+  },
+  selectedItemContainer: {
+    position: 'relative',
+    height: 180,
+    padding: spacing.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectedItemImage: {
+    width: '100%',
+    height: '100%',
+  },
+  removeButton: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.full,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+});

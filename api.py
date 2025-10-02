@@ -245,7 +245,13 @@ def delete_wardrobe_item(clothing_id: str):
         
         if not item:
             raise HTTPException(status_code=404, detail="clothing item not found")
+        print(f"\n=== deleting {clothing_id} ===")
+        print(f"Item found: {item}")  # ADD THIS
         
+        # delete from database
+        result = db.delete_wardrobe_item(user_id, clothing_id)  # CAPTURE RESULT
+        print(f"Delete result: {result}")  # ADD THIS
+
         print(f"\n=== deleting {clothing_id} ===")
         
         # delete from database

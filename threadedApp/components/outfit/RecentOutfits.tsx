@@ -1,58 +1,61 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { styles } from '../../styles/theme';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { styles, colors, spacing, borderRadius } from '../../styles/theme';
 import { Rating } from '../../types';
 import { ClothingImage } from '../shared/ClothingImage';
 
 interface RecentOutfitsProps {
   ratings: Rating[];
-  onOutfitPress?: (rating: Rating) => void;
+  onOutfitPress: (rating: Rating) => void;
 }
 
 export const RecentOutfits: React.FC<RecentOutfitsProps> = ({ ratings, onOutfitPress }) => {
-  if (ratings.length === 0) return null;
+  if (ratings.length === 0) {
+    return null;
+  }
+
+  const recentRatings = ratings.slice(0, 10);
 
   return (
     <View style={styles.recentSection}>
       <Text style={styles.recentSectionTitle}>recently rated</Text>
       
-      <View style={styles.recentCardsContainer}>
-        {ratings.map((rating) => (
-          <TouchableOpacity 
-            key={rating.id} 
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={true}
+        contentContainerStyle={localStyles.scrollContent}
+      >
+        {recentRatings.map((item, index) => (
+          <TouchableOpacity
+            key={`${item.shirt_id}-${item.pants_id}-${item.shoes_id}-${index}`}
             style={styles.recentOutfitCard}
-            onPress={() => onOutfitPress?.(rating)}
+            onPress={() => onOutfitPress(item)}
             activeOpacity={0.7}
           >
             <View style={styles.recentOutfitImageContainer}>
-              <ClothingImage 
-                clothingId={rating.shirt_id}
-                style={styles.recentOutfitImage}
-              />
+              <ClothingImage clothingId={item.shirt_id} style={styles.recentOutfitImage} />
             </View>
-            
             <View style={styles.recentOutfitImageContainer}>
-              <ClothingImage 
-                clothingId={rating.pants_id}
-                style={styles.recentOutfitImage}
-              />
+              <ClothingImage clothingId={item.pants_id} style={styles.recentOutfitImage} />
             </View>
-            
             <View style={styles.recentOutfitImageContainer}>
-              <ClothingImage 
-                clothingId={rating.shoes_id}
-                style={styles.recentOutfitImage}
-              />
+              <ClothingImage clothingId={item.shoes_id} style={styles.recentOutfitImage} />
             </View>
-            
             <View style={styles.recentOutfitRating}>
               <Text style={styles.recentRatingStars}>
-                {'★'.repeat(rating.rating)}{'☆'.repeat(5 - rating.rating)}
+                {'★'.repeat(item.rating)}{'☆'.repeat(5 - item.rating)}
               </Text>
             </View>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
     </View>
   );
 };
+
+const localStyles = StyleSheet.create({
+  scrollContent: {
+    paddingHorizontal: spacing.xl,
+    gap: spacing.xxxl,
+  },
+});

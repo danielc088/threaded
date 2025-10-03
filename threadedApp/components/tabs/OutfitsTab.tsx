@@ -66,7 +66,7 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
   const loadRecentRatings = async () => {
     try {
       const data = await getRatings();
-      setRecentRatings(data.slice(0, 3));
+      setRecentRatings(data.slice(0, 10));
     } catch (error) {
       console.log('Error loading ratings:', error);
     }
@@ -93,6 +93,17 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
         pants: data.pants,
         shoes: data.shoes,
       });
+      
+      // Check if this outfit was already rated
+      const existingRating = recentRatings.find(
+        r => r.shirt_id === data.shirt && 
+             r.pants_id === data.pants && 
+             r.shoes_id === data.shoes
+      );
+      
+      if (existingRating) {
+        setLastRating(existingRating.rating);
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to generate outfit');
       console.error('Generate outfit error:', error);
@@ -162,12 +173,8 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
       
       setLastRating(rating);
       
-      setTimeout(() => {
-        setSelectedItems({ shirt: null, pants: null, shoes: null });
-        setCurrentOutfit(null);
-        setLastRating(null);
-      }, 1500);
-      
+      // Don't clear the outfit - keep it displayed for reference
+      // Just refresh stats and recent ratings
       loadStats();
       loadRecentRatings();
       
@@ -256,7 +263,7 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
                       style={localStyles.removeButton}
                       onPress={() => clearItemSlot(type)}
                     >
-                      <MaterialCommunityIcons name="close-circle" size={24} color={colors.error} />
+                      <MaterialCommunityIcons name="trash-can-outline" size={24} color={colors.error} />
                     </TouchableOpacity>
                   </View>
                 ) : (
@@ -282,11 +289,12 @@ export const OutfitsTab: React.FC<OutfitsTabProps> = ({
         ) : currentOutfit ? (
           <>
             <View style={styles.ratingSection}>
-              <Text style={styles.ratingLabel}>rate this outfit</Text>
+              <Text style={styles.ratingLabel}>
+                {lastRating !== null ? 'update rating' : 'rate this outfit'}
+              </Text>
               <StarRating 
                 rating={lastRating}
                 onRate={handleRateOutfit}
-                disabled={lastRating !== null}
               />
             </View>
           </>
@@ -353,7 +361,7 @@ const localStyles = StyleSheet.create({
     overflow: 'hidden',
   },
   emptySlot: {
-    height: 180,
+    height: 250,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.surface,
@@ -371,7 +379,7 @@ const localStyles = StyleSheet.create({
   },
   selectedItemContainer: {
     position: 'relative',
-    height: 180,
+    height: 250,
     padding: spacing.sm,
     justifyContent: 'center',
     alignItems: 'center',
